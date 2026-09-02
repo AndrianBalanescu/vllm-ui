@@ -74,6 +74,13 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #10b981;
     }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.85; filter: brightness(1); }
+      50% { opacity: 1; filter: brightness(1.25); }
+    }
+    .span-active {
+      animation: pulseGlow 1.8s infinite ease-in-out;
+    }
   </style>
 </head>
 <body class="min-h-screen antialiased selection:bg-emerald-500 selection:text-black">
@@ -88,7 +95,7 @@
         <div>
           <div class="flex items-center gap-2.5">
             <h1 class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
-              vLLM Telemetry & Control
+              vLLM Telemetry & Control Center
             </h1>
             <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-800/50">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -107,41 +114,36 @@
 
       <!-- Services Status Pills & Global Controls -->
       <div class="flex flex-wrap items-center gap-2">
-        <!-- Service 1: vLLM -->
         <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-xs font-mono">
           <span class="w-2 h-2 rounded-full" :class="stats.services?.vllm === 'online' ? 'bg-emerald-400' : 'bg-rose-500'"></span>
-          <span class="text-slate-300">vLLM</span>
+          <span class="text-slate-300">vLLM Engine</span>
           <span class="text-slate-500 text-[10px]">:8000</span>
         </div>
 
-        <!-- Service 2: FastEmbed CPU -->
         <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-xs font-mono">
           <span class="w-2 h-2 rounded-full" :class="stats.services?.fastembed_cpu === 'online' ? 'bg-emerald-400' : 'bg-rose-500'"></span>
           <span class="text-slate-300">FastEmbed (28 vCPU)</span>
           <span class="text-slate-500 text-[10px]">:8002</span>
         </div>
 
-        <!-- Service 3: iBrowse -->
         <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-xs font-mono">
           <span class="w-2 h-2 rounded-full" :class="stats.services?.ibrowse === 'online' ? 'bg-emerald-400' : 'bg-rose-500'"></span>
           <span class="text-slate-300">iBrowse</span>
           <span class="text-slate-500 text-[10px]">:3000</span>
         </div>
 
-        <!-- cURL Modal Trigger -->
         <button @click="showCurlModal = true" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 border border-slate-700 text-xs font-mono transition">
           <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
           <span>cURL / API</span>
         </button>
 
-        <!-- Refresh Button -->
         <button @click="fetchStats(true)" class="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition border border-slate-700" title="Refresh">
           <i data-lucide="rotate-cw" class="w-3.5 h-3.5" :class="{'animate-spin': isRefreshing}"></i>
         </button>
       </div>
     </header>
 
-    <!-- Compact Key Stats Cards Grid (4 Column Dense Layout) -->
+    <!-- Compact Key Stats Cards Grid -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
       
       <!-- Card 1: Throughput tok/s -->
@@ -220,6 +222,143 @@
 
     </div>
 
+    <!-- NEW: CONCURRENT REQUEST TIMELINE & WATERFALL CANVAS -->
+    <div class="glass-card rounded-xl p-4 relative">
+      <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+        <div class="flex items-center gap-2">
+          <div class="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse"></div>
+          <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
+            Concurrent Request Timeline (Waterfall)
+          </h2>
+          <span class="text-xs font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+            {{ timelineRequests.length }} requests in window
+          </span>
+        </div>
+
+        <!-- Timeline Filters & Legend -->
+        <div class="flex flex-wrap items-center gap-3 text-xs font-mono">
+          <div class="flex items-center gap-2.5 pr-2 border-r border-slate-800">
+            <span class="flex items-center gap-1 text-purple-400"><span class="w-2 h-2 rounded-full bg-purple-500"></span> Active (In-flight)</span>
+            <span class="flex items-center gap-1 text-emerald-400"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> 2xx Success</span>
+            <span class="flex items-center gap-1 text-rose-400"><span class="w-2 h-2 rounded-full bg-rose-500"></span> 5xx Error</span>
+          </div>
+
+          <div class="flex items-center bg-slate-900 rounded-lg p-0.5 border border-slate-800 text-[11px]">
+            <button @click="timelineFilter = 'all'" :class="timelineFilter === 'all' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'" class="px-2 py-0.5 rounded">All</button>
+            <button @click="timelineFilter = 'active'" :class="timelineFilter === 'active' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'" class="px-2 py-0.5 rounded">Active</button>
+            <button @click="timelineFilter = '2xx'" :class="timelineFilter === '2xx' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'" class="px-2 py-0.5 rounded">2xx</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline Container -->
+      <div class="mt-3 overflow-x-auto relative">
+        <!-- Time Axis Markers across top -->
+        <div class="flex justify-between items-center text-[10px] font-mono text-slate-500 pb-1.5 border-b border-slate-800/60 pl-48 pr-2">
+          <span>{{ timelineBounds.minLabel }}</span>
+          <span>-45s</span>
+          <span>-30s</span>
+          <span>-15s</span>
+          <span>{{ timelineBounds.maxLabel }} (Now)</span>
+        </div>
+
+        <!-- Waterfall Rows List -->
+        <div class="min-w-[700px] max-h-72 overflow-y-auto space-y-1.5 py-2 relative">
+          
+          <div v-if="timelineRequests.length === 0" class="text-slate-500 text-xs font-mono text-center py-6">
+            Awaiting concurrent model requests to visualize waterfall traces...
+          </div>
+
+          <!-- Individual Request Row -->
+          <div 
+            v-for="(req, idx) in timelineRequests" 
+            :key="req.id || idx" 
+            class="group flex items-center h-8 relative rounded-lg hover:bg-slate-900/60 transition duration-150 px-1"
+            @mouseenter="hoveredReq = req"
+            @mouseleave="hoveredReq = null"
+          >
+            <!-- Left Info Column (Sticky) -->
+            <div class="w-48 shrink-0 flex items-center justify-between pr-3 font-mono text-[11px] truncate">
+              <div class="flex items-center gap-1.5 truncate">
+                <span class="w-2 h-2 rounded-full shrink-0" :class="getStatusDotClass(req.status)"></span>
+                <span class="text-slate-200 font-semibold truncate">{{ req.model || 'qwen3.8-27b' }}</span>
+              </div>
+              <span class="text-[10px] text-slate-400 shrink-0 font-mono">{{ formatMs(req.duration_ms) }}</span>
+            </div>
+
+            <!-- Right Timeline Track & Span Bar -->
+            <div class="flex-1 h-full relative bg-dark-950/60 rounded-md border border-slate-800/40 overflow-hidden flex items-center">
+              
+              <!-- Background grid lines -->
+              <div class="absolute inset-0 flex justify-between pointer-events-none opacity-10">
+                <div class="w-[1px] h-full bg-slate-400"></div>
+                <div class="w-[1px] h-full bg-slate-400"></div>
+                <div class="w-[1px] h-full bg-slate-400"></div>
+                <div class="w-[1px] h-full bg-slate-400"></div>
+              </div>
+
+              <!-- The Horizontal Request Span Bar -->
+              <div 
+                class="absolute h-5 rounded-md flex items-center px-2 text-[10px] font-mono transition-all duration-300 cursor-pointer shadow-sm"
+                :class="[getSpanBgClass(req.status), req.status === 'active' ? 'span-active border border-purple-400/80' : 'border border-white/10']"
+                :style="getSpanStyle(req)"
+              >
+                <!-- Label inside bar if wide enough -->
+                <span class="truncate font-bold text-white drop-shadow-sm flex items-center gap-1">
+                  <span>{{ req.model }}</span>
+                  <span v-if="req.prompt_tokens" class="text-slate-200 font-normal">({{ formatNumber(req.prompt_tokens) }} / {{ req.completion_tokens }} tok)</span>
+                </span>
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- FLOATING TOOLTIP (SIMILAR TO IMAGE 1) -->
+      <div 
+        v-if="hoveredReq" 
+        class="absolute z-40 bg-dark-900/95 backdrop-blur-md border border-slate-700 rounded-xl p-3.5 shadow-2xl text-xs font-mono space-y-2 pointer-events-none w-72 transition-all duration-150 top-16 right-6"
+      >
+        <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+          <span class="font-bold text-white truncate text-sm">{{ hoveredReq.model }}</span>
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="getStatusBadgeClass(hoveredReq.status)">
+            {{ hoveredReq.status === 'active' ? 'ACTIVE' : hoveredReq.status }}
+          </span>
+        </div>
+
+        <div class="space-y-1 text-slate-300 text-[11px]">
+          <div class="flex justify-between">
+            <span class="text-slate-500">Started:</span>
+            <span>{{ formatTime(hoveredReq.start_time) }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Ended:</span>
+            <span>{{ hoveredReq.end_time ? formatTime(hoveredReq.end_time) : 'In Progress...' }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Duration:</span>
+            <span class="text-emerald-400 font-bold">{{ formatNumber(hoveredReq.duration_ms) }} ms</span>
+          </div>
+          <div class="flex justify-between pt-1 border-t border-slate-800">
+            <span class="text-slate-500">Tokens (In / Out):</span>
+            <span class="text-white font-semibold">{{ formatNumber(hoveredReq.prompt_tokens || 0) }} / {{ formatNumber(hoveredReq.completion_tokens || 0) }}</span>
+          </div>
+          <div class="flex justify-between" v-if="hoveredReq.tps > 0">
+            <span class="text-slate-500">Speed:</span>
+            <span class="text-emerald-400 font-bold">⚡ {{ hoveredReq.tps }} tok/s</span>
+          </div>
+          <div v-if="hoveredReq.prompt_preview" class="pt-1 border-t border-slate-800 text-[10px] text-slate-400 italic truncate">
+            "{{ hoveredReq.prompt_preview }}"
+          </div>
+        </div>
+      </div>
+
+    </div>
+
     <!-- Main Workspace: Throughput Chart, Enlarged Logs & Speed Playground -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
       
@@ -231,11 +370,11 @@
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-2">
               <i data-lucide="line-chart" class="w-4 h-4 text-emerald-400"></i>
-              <h2 class="text-sm font-bold text-white">Throughput Timeline</h2>
+              <h2 class="text-sm font-bold text-white">Throughput Timeline (Tokens / Sec)</h2>
             </div>
             <div class="flex items-center gap-3 text-xs font-mono">
-              <span class="flex items-center gap-1 text-emerald-400"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Generation tok/s</span>
-              <span class="flex items-center gap-1 text-blue-400"><span class="w-2 h-2 rounded-full bg-blue-400"></span> Prefill tok/s</span>
+              <span class="flex items-center gap-1 text-emerald-400"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Generation</span>
+              <span class="flex items-center gap-1 text-blue-400"><span class="w-2 h-2 rounded-full bg-blue-400"></span> Prefill</span>
             </div>
           </div>
           <div class="h-44 w-full">
@@ -243,7 +382,7 @@
           </div>
         </div>
 
-        <!-- Enlarged Live Journal & Request Logs (Bigger Container) -->
+        <!-- Enlarged Live Journal & Request Logs -->
         <div class="glass-card rounded-xl p-4">
           <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
             <div class="flex items-center gap-2">
@@ -266,7 +405,7 @@
             </div>
           </div>
 
-          <!-- The Enlarged Logs Box (Height 72/80 for great visibility) -->
+          <!-- The Enlarged Logs Box -->
           <div ref="logBox" class="bg-dark-950/90 rounded-xl p-3 font-mono text-[11px] text-slate-300 border border-slate-800/80 h-72 lg:h-80 overflow-y-auto space-y-1">
             <div v-if="filteredLogs.length === 0" class="text-slate-500 italic py-2 text-center">No matching log events in buffer...</div>
             <div v-for="(log, idx) in filteredLogs" :key="idx" class="leading-relaxed whitespace-pre-wrap break-all py-0.5" :class="getLogClass(log)">
@@ -289,7 +428,6 @@
               <h2 class="text-sm font-bold text-white">Interactive Playground</h2>
             </div>
             
-            <!-- Dynamic Model Selector -->
             <div class="flex items-center gap-1.5">
               <span class="text-[11px] font-mono text-slate-400">Model:</span>
               <select v-model="selectedModel" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-emerald-400 font-mono focus:outline-none focus:border-emerald-500">
@@ -303,7 +441,7 @@
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label class="text-[11px] font-semibold text-slate-400">Test Prompt</label>
-                <button type="button" @click="promptInput = 'Scrie un benchmark concis in Rust pentru streaming HTTP cu reqwest.'" class="text-[10px] text-emerald-400 hover:underline font-mono">Example prompt</button>
+                <button type="button" @click="promptInput = 'Scrie o functie concisa in Rust pentru streaming HTTP cu reqwest.'" class="text-[10px] text-emerald-400 hover:underline font-mono">Example prompt</button>
               </div>
               <textarea v-model="promptInput" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono resize-none transition" placeholder="Scrie promptul de testare..."></textarea>
             </div>
@@ -356,7 +494,6 @@
           </button>
         </div>
 
-        <!-- Available Models from /v1/models -->
         <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs font-mono space-y-1">
           <div class="text-slate-400">Modele active raportate de <code class="text-emerald-400">/v1/models</code>:</div>
           <div class="flex flex-wrap gap-1.5 pt-1">
@@ -366,7 +503,6 @@
           </div>
         </div>
 
-        <!-- Tab selection for cURL / Python -->
         <div class="space-y-2">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">cURL Request (OpenAI Compatible)</span>
@@ -397,6 +533,8 @@
         const stats = ref({});
         const isRefreshing = ref(false);
         const logFilter = ref('all');
+        const timelineFilter = ref('all');
+        const hoveredReq = ref(null);
         const selectedModel = ref('qwen3.8-27b-clean-int4');
         const promptInput = ref("Scrie o functie scurta in Python de 2 linii.");
         const isInferring = ref(false);
@@ -411,6 +549,63 @@
           labels: [],
           genTps: [],
           promptTps: []
+        };
+
+        const timelineRequests = computed(() => {
+          const reqs = stats.value.timeline || [];
+          if (timelineFilter.value === 'active') return reqs.filter(r => r.status === 'active');
+          if (timelineFilter.value === '2xx') return reqs.filter(r => r.status === 200 || r.status === '200');
+          return reqs;
+        });
+
+        const timelineBounds = computed(() => {
+          const reqs = stats.value.timeline || [];
+          const now = Date.now() / 1000;
+          let minTime = now - 60; // 60s window
+          if (reqs.length > 0) {
+            const earliest = Math.min(...reqs.map(r => r.start_time));
+            if (earliest < minTime && (now - earliest) < 300) {
+              minTime = earliest;
+            }
+          }
+          return {
+            min: minTime,
+            max: now,
+            duration: Math.max(now - minTime, 30),
+            minLabel: new Date(minTime * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            maxLabel: new Date(now * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+          };
+        });
+
+        const getSpanStyle = (req) => {
+          const bounds = timelineBounds.value;
+          const startRel = Math.max(req.start_time - bounds.min, 0);
+          const leftPct = Math.min(Math.max((startRel / bounds.duration) * 100, 0), 96);
+          const durSec = (req.duration_ms || 1000) / 1000;
+          const widthPct = Math.min(Math.max((durSec / bounds.duration) * 100, 3.5), 100 - leftPct);
+
+          return {
+            left: `${leftPct.toFixed(2)}%`,
+            width: `${widthPct.toFixed(2)}%`
+          };
+        };
+
+        const getSpanBgClass = (status) => {
+          if (status === 'active') return 'bg-gradient-to-r from-purple-600 to-indigo-500 shadow-purple-900/50';
+          if (status === 200 || status === '200') return 'bg-gradient-to-r from-emerald-600 to-teal-500 shadow-emerald-900/40';
+          return 'bg-gradient-to-r from-rose-600 to-red-500 shadow-rose-900/40';
+        };
+
+        const getStatusDotClass = (status) => {
+          if (status === 'active') return 'bg-purple-400 animate-pulse';
+          if (status === 200 || status === '200') return 'bg-emerald-400';
+          return 'bg-rose-500';
+        };
+
+        const getStatusBadgeClass = (status) => {
+          if (status === 'active') return 'bg-purple-950 text-purple-300 border border-purple-800';
+          if (status === 200 || status === '200') return 'bg-emerald-950 text-emerald-300 border border-emerald-800';
+          return 'bg-rose-950 text-rose-300 border border-rose-800';
         };
 
         const filteredLogs = computed(() => {
@@ -574,7 +769,18 @@
           setTimeout(() => { copyStatus.value = ""; }, 2000);
         };
 
-        const formatNumber = (num) => new Intl.NumberFormat().format(num);
+        const formatNumber = (num) => new Intl.NumberFormat().format(num || 0);
+
+        const formatMs = (ms) => {
+          if (!ms) return '0ms';
+          if (ms < 1000) return `${ms}ms`;
+          return `${(ms / 1000).toFixed(1)}s`;
+        };
+
+        const formatTime = (epochSec) => {
+          if (!epochSec) return '-';
+          return new Date(epochSec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        };
 
         const getLogClass = (log) => {
           if (log.includes('Engine 000:')) return 'text-emerald-400 font-semibold';
@@ -587,7 +793,7 @@
         onMounted(() => {
           initChart();
           fetchStats();
-          setInterval(fetchStats, 2000);
+          setInterval(fetchStats, 1500);
           lucide.createIcons();
         });
 
@@ -595,6 +801,10 @@
           stats,
           isRefreshing,
           logFilter,
+          timelineFilter,
+          timelineRequests,
+          timelineBounds,
+          hoveredReq,
           filteredLogs,
           selectedModel,
           promptInput,
@@ -610,6 +820,12 @@
           copyLogs,
           copyCurlSnippet,
           formatNumber,
+          formatMs,
+          formatTime,
+          getSpanStyle,
+          getSpanBgClass,
+          getStatusDotClass,
+          getStatusBadgeClass,
           getLogClass
         };
       }
