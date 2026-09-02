@@ -74,13 +74,6 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #10b981;
     }
-    @keyframes pulseGlow {
-      0%, 100% { opacity: 0.85; filter: brightness(1); }
-      50% { opacity: 1; filter: brightness(1.25); }
-    }
-    .span-active {
-      animation: pulseGlow 1.8s infinite ease-in-out;
-    }
   </style>
 </head>
 <body class="min-h-screen antialiased selection:bg-emerald-500 selection:text-black">
@@ -122,7 +115,7 @@
 
         <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-xs font-mono">
           <span class="w-2 h-2 rounded-full" :class="stats.services?.fastembed_cpu === 'online' ? 'bg-emerald-400' : 'bg-rose-500'"></span>
-          <span class="text-slate-300">FastEmbed (28 vCPU)</span>
+          <span class="text-slate-300">FastEmbed</span>
           <span class="text-slate-500 text-[10px]">:8002</span>
         </div>
 
@@ -222,106 +215,66 @@
 
     </div>
 
-    <!-- NEW: CONCURRENT REQUEST TIMELINE & WATERFALL CANVAS -->
-    <div class="glass-card rounded-xl p-4 relative">
+    <!-- REAL-TIME 60FPS SMOOTH ROLLING CANVAS TIMELINE (WATERFALL) -->
+    <div class="glass-card rounded-xl p-4 relative flex flex-col">
       <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
         <div class="flex items-center gap-2">
-          <div class="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse"></div>
+          <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
           <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
-            Concurrent Request Timeline (Waterfall)
+            Real-Time Request Waterfall (Streaming Timeline)
           </h2>
-          <span class="text-xs font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-            {{ timelineRequests.length }} requests in window
+          <span class="text-[11px] font-mono text-emerald-400 bg-emerald-950/80 border border-emerald-800/50 px-2 py-0.5 rounded">
+            Live Stream (60 FPS)
           </span>
         </div>
 
-        <!-- Timeline Filters & Legend -->
+        <!-- Zoom Window Presets, Filters & Play/Pause -->
         <div class="flex flex-wrap items-center gap-3 text-xs font-mono">
-          <div class="flex items-center gap-2.5 pr-2 border-r border-slate-800">
-            <span class="flex items-center gap-1 text-purple-400"><span class="w-2 h-2 rounded-full bg-purple-500"></span> Active (In-flight)</span>
-            <span class="flex items-center gap-1 text-emerald-400"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> 2xx Success</span>
-            <span class="flex items-center gap-1 text-rose-400"><span class="w-2 h-2 rounded-full bg-rose-500"></span> 5xx Error</span>
+          
+          <!-- Zoom Presets -->
+          <div class="flex items-center gap-1 bg-slate-900 rounded-lg p-0.5 border border-slate-800 text-[11px]">
+            <span class="text-slate-500 px-1.5 text-[10px]">Zoom:</span>
+            <button v-for="w in [15, 30, 60, 120, 300]" :key="w" @click="timeWindowSec = w" :class="timeWindowSec === w ? 'bg-emerald-600 text-black font-bold' : 'text-slate-400 hover:text-white'" class="px-2 py-0.5 rounded transition">
+              {{ w < 60 ? w + 's' : (w/60) + 'm' }}
+            </button>
           </div>
 
+          <!-- Filter chips -->
           <div class="flex items-center bg-slate-900 rounded-lg p-0.5 border border-slate-800 text-[11px]">
             <button @click="timelineFilter = 'all'" :class="timelineFilter === 'all' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'" class="px-2 py-0.5 rounded">All</button>
             <button @click="timelineFilter = 'active'" :class="timelineFilter === 'active' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'" class="px-2 py-0.5 rounded">Active</button>
             <button @click="timelineFilter = '2xx'" :class="timelineFilter === '2xx' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'" class="px-2 py-0.5 rounded">2xx</button>
           </div>
+
+          <!-- Pause/Resume Stream -->
+          <button @click="isTimelinePaused = !isTimelinePaused" :class="isTimelinePaused ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-300 hover:text-white'" class="px-2.5 py-1 rounded-lg border border-slate-700 text-[11px] flex items-center gap-1.5 transition">
+            <i :data-lucide="isTimelinePaused ? 'play' : 'pause'" class="w-3 h-3"></i>
+            <span>{{ isTimelinePaused ? 'Resume' : 'Pause' }}</span>
+          </button>
         </div>
       </div>
 
-      <!-- Timeline Container -->
-      <div class="mt-3 overflow-x-auto relative">
-        <!-- Time Axis Markers across top -->
-        <div class="flex justify-between items-center text-[10px] font-mono text-slate-500 pb-1.5 border-b border-slate-800/60 pl-48 pr-2">
-          <span>{{ timelineBounds.minLabel }}</span>
-          <span>-45s</span>
-          <span>-30s</span>
-          <span>-15s</span>
-          <span>{{ timelineBounds.maxLabel }} (Now)</span>
+      <!-- Canvas Container (Fixed Height with interactive overlay) -->
+      <div class="mt-3 relative w-full h-64 bg-dark-950/90 rounded-xl border border-slate-800/80 overflow-hidden select-none">
+        <canvas 
+          ref="timelineCanvas" 
+          class="w-full h-full block cursor-crosshair"
+          @mousemove="handleCanvasMouseMove"
+          @mouseleave="hoveredReq = null"
+        ></canvas>
+
+        <!-- Right "NOW" indicator badge -->
+        <div class="absolute top-2 right-2 pointer-events-none flex items-center gap-1.5 bg-dark-900/90 border border-slate-800 px-2 py-0.5 rounded text-[10px] font-mono text-emerald-400">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>NOW</span>
         </div>
-
-        <!-- Waterfall Rows List -->
-        <div class="min-w-[700px] max-h-72 overflow-y-auto space-y-1.5 py-2 relative">
-          
-          <div v-if="timelineRequests.length === 0" class="text-slate-500 text-xs font-mono text-center py-6">
-            Awaiting concurrent model requests to visualize waterfall traces...
-          </div>
-
-          <!-- Individual Request Row -->
-          <div 
-            v-for="(req, idx) in timelineRequests" 
-            :key="req.id || idx" 
-            class="group flex items-center h-8 relative rounded-lg hover:bg-slate-900/60 transition duration-150 px-1"
-            @mouseenter="hoveredReq = req"
-            @mouseleave="hoveredReq = null"
-          >
-            <!-- Left Info Column (Sticky) -->
-            <div class="w-48 shrink-0 flex items-center justify-between pr-3 font-mono text-[11px] truncate">
-              <div class="flex items-center gap-1.5 truncate">
-                <span class="w-2 h-2 rounded-full shrink-0" :class="getStatusDotClass(req.status)"></span>
-                <span class="text-slate-200 font-semibold truncate">{{ req.model || 'qwen3.8-27b' }}</span>
-              </div>
-              <span class="text-[10px] text-slate-400 shrink-0 font-mono">{{ formatMs(req.duration_ms) }}</span>
-            </div>
-
-            <!-- Right Timeline Track & Span Bar -->
-            <div class="flex-1 h-full relative bg-dark-950/60 rounded-md border border-slate-800/40 overflow-hidden flex items-center">
-              
-              <!-- Background grid lines -->
-              <div class="absolute inset-0 flex justify-between pointer-events-none opacity-10">
-                <div class="w-[1px] h-full bg-slate-400"></div>
-                <div class="w-[1px] h-full bg-slate-400"></div>
-                <div class="w-[1px] h-full bg-slate-400"></div>
-                <div class="w-[1px] h-full bg-slate-400"></div>
-              </div>
-
-              <!-- The Horizontal Request Span Bar -->
-              <div 
-                class="absolute h-5 rounded-md flex items-center px-2 text-[10px] font-mono transition-all duration-300 cursor-pointer shadow-sm"
-                :class="[getSpanBgClass(req.status), req.status === 'active' ? 'span-active border border-purple-400/80' : 'border border-white/10']"
-                :style="getSpanStyle(req)"
-              >
-                <!-- Label inside bar if wide enough -->
-                <span class="truncate font-bold text-white drop-shadow-sm flex items-center gap-1">
-                  <span>{{ req.model }}</span>
-                  <span v-if="req.prompt_tokens" class="text-slate-200 font-normal">({{ formatNumber(req.prompt_tokens) }} / {{ req.completion_tokens }} tok)</span>
-                </span>
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
       </div>
 
-      <!-- FLOATING TOOLTIP (SIMILAR TO IMAGE 1) -->
+      <!-- Tooltip Popover (Similar to Image 1) -->
       <div 
         v-if="hoveredReq" 
-        class="absolute z-40 bg-dark-900/95 backdrop-blur-md border border-slate-700 rounded-xl p-3.5 shadow-2xl text-xs font-mono space-y-2 pointer-events-none w-72 transition-all duration-150 top-16 right-6"
+        class="absolute z-40 bg-dark-900/95 backdrop-blur-md border border-slate-700 rounded-xl p-3.5 shadow-2xl text-xs font-mono space-y-2 pointer-events-none w-72 transition-all duration-75"
+        :style="tooltipPosStyle"
       >
         <div class="flex items-center justify-between pb-2 border-b border-slate-800">
           <span class="font-bold text-white truncate text-sm">{{ hoveredReq.model }}</span>
@@ -337,7 +290,7 @@
           </div>
           <div class="flex justify-between">
             <span class="text-slate-500">Ended:</span>
-            <span>{{ hoveredReq.end_time ? formatTime(hoveredReq.end_time) : 'In Progress...' }}</span>
+            <span>{{ hoveredReq.end_time ? formatTime(hoveredReq.end_time) : 'In Progress (Active)' }}</span>
           </div>
           <div class="flex justify-between">
             <span class="text-slate-500">Duration:</span>
@@ -526,7 +479,7 @@
 
   <!-- Vue 3 App Implementation -->
   <script>
-    const { createApp, ref, computed, onMounted, nextTick } = Vue;
+    const { createApp, ref, computed, onMounted, onUnmounted, nextTick } = Vue;
 
     createApp({
       setup() {
@@ -534,7 +487,12 @@
         const isRefreshing = ref(false);
         const logFilter = ref('all');
         const timelineFilter = ref('all');
+        const timeWindowSec = ref(30); // 30s zoom window by default
+        const isTimelinePaused = ref(false);
         const hoveredReq = ref(null);
+        const mouseX = ref(0);
+        const mouseY = ref(0);
+        const timelineCanvas = ref(null);
         const selectedModel = ref('qwen3.8-27b-clean-int4');
         const promptInput = ref("Scrie o functie scurta in Python de 2 linii.");
         const isInferring = ref(false);
@@ -545,74 +503,28 @@
         const logBox = ref(null);
 
         let chartInstance = null;
+        let animationFrameId = null;
         const chartHistory = {
           labels: [],
           genTps: [],
           promptTps: []
         };
 
-        const timelineRequests = computed(() => {
-          const reqs = stats.value.timeline || [];
-          if (timelineFilter.value === 'active') return reqs.filter(r => r.status === 'active');
-          if (timelineFilter.value === '2xx') return reqs.filter(r => r.status === 200 || r.status === '200');
-          return reqs;
-        });
-
-        const timelineBounds = computed(() => {
-          const reqs = stats.value.timeline || [];
-          const now = Date.now() / 1000;
-          let minTime = now - 60; // 60s window
-          if (reqs.length > 0) {
-            const earliest = Math.min(...reqs.map(r => r.start_time));
-            if (earliest < minTime && (now - earliest) < 300) {
-              minTime = earliest;
-            }
-          }
-          return {
-            min: minTime,
-            max: now,
-            duration: Math.max(now - minTime, 30),
-            minLabel: new Date(minTime * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-            maxLabel: new Date(now * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-          };
-        });
-
-        const getSpanStyle = (req) => {
-          const bounds = timelineBounds.value;
-          const startRel = Math.max(req.start_time - bounds.min, 0);
-          const leftPct = Math.min(Math.max((startRel / bounds.duration) * 100, 0), 96);
-          const durSec = (req.duration_ms || 1000) / 1000;
-          const widthPct = Math.min(Math.max((durSec / bounds.duration) * 100, 3.5), 100 - leftPct);
-
-          return {
-            left: `${leftPct.toFixed(2)}%`,
-            width: `${widthPct.toFixed(2)}%`
-          };
-        };
-
-        const getSpanBgClass = (status) => {
-          if (status === 'active') return 'bg-gradient-to-r from-purple-600 to-indigo-500 shadow-purple-900/50';
-          if (status === 200 || status === '200') return 'bg-gradient-to-r from-emerald-600 to-teal-500 shadow-emerald-900/40';
-          return 'bg-gradient-to-r from-rose-600 to-red-500 shadow-rose-900/40';
-        };
-
-        const getStatusDotClass = (status) => {
-          if (status === 'active') return 'bg-purple-400 animate-pulse';
-          if (status === 200 || status === '200') return 'bg-emerald-400';
-          return 'bg-rose-500';
-        };
-
-        const getStatusBadgeClass = (status) => {
-          if (status === 'active') return 'bg-purple-950 text-purple-300 border border-purple-800';
-          if (status === 200 || status === '200') return 'bg-emerald-950 text-emerald-300 border border-emerald-800';
-          return 'bg-rose-950 text-rose-300 border border-rose-800';
-        };
+        // Rendered span hit targets for mouse hover
+        let renderedSpans = [];
 
         const filteredLogs = computed(() => {
           const logs = stats.value.recent_logs || [];
           if (logFilter.value === 'engine') return logs.filter(l => l.includes('Engine 000:'));
           if (logFilter.value === 'reqs') return logs.filter(l => l.includes('POST /v1/chat/completions'));
           return logs;
+        });
+
+        const tooltipPosStyle = computed(() => {
+          return {
+            top: `${Math.min(Math.max(mouseY.value + 15, 10), 140)}px`,
+            left: `${Math.min(Math.max(mouseX.value + 15, 10), window.innerWidth - 320)}px`
+          };
         });
 
         const curlSnippet = computed(() => {
@@ -627,6 +539,200 @@
     "max_tokens": 128
   }'`;
         });
+
+        // 60FPS Continuous Canvas Animation Loop
+        const startCanvasLoop = () => {
+          const canvas = timelineCanvas.value;
+          if (!canvas) return;
+          const ctx = canvas.getContext('2d');
+
+          const render = () => {
+            if (!isTimelinePaused.value) {
+              drawTimeline(canvas, ctx);
+            }
+            animationFrameId = requestAnimationFrame(render);
+          };
+          animationFrameId = requestAnimationFrame(render);
+        };
+
+        const drawTimeline = (canvas, ctx) => {
+          const rect = canvas.getBoundingClientRect();
+          const dpr = window.devicePixelRatio || 1;
+          const width = rect.width;
+          const height = rect.height;
+
+          if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+          }
+
+          ctx.save();
+          ctx.scale(dpr, dpr);
+
+          // Clear background
+          ctx.fillStyle = '#070b14';
+          ctx.fillRect(0, 0, width, height);
+
+          const now = Date.now() / 1000;
+          const windowSec = timeWindowSec.value;
+          const minTime = now - windowSec;
+
+          // Draw Time Grid & Markers
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+          ctx.lineWidth = 1;
+          ctx.font = '10px "JetBrains Mono", monospace';
+          ctx.fillStyle = '#64748b';
+
+          const gridStepSec = windowSec <= 15 ? 2.5 : (windowSec <= 30 ? 5 : (windowSec <= 60 ? 10 : 30));
+          const firstGridTime = Math.ceil(minTime / gridStepSec) * gridStepSec;
+
+          for (let t = firstGridTime; t <= now; t += gridStepSec) {
+            const x = ((t - minTime) / windowSec) * width;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+
+            const secAgo = Math.round(now - t);
+            const label = secAgo === 0 ? 'NOW' : `-${secAgo}s`;
+            ctx.fillText(label, x + 4, 14);
+          }
+
+          // Fetch and filter timeline requests
+          const allReqs = stats.value.timeline || [];
+          let reqs = allReqs.filter(r => {
+            if (timelineFilter.value === 'active') return r.status === 'active';
+            if (timelineFilter.value === '2xx') return r.status === 200 || r.status === '200';
+            return true;
+          });
+
+          // Sort requests by start_time
+          reqs = reqs.slice().sort((a, b) => a.start_time - b.start_time);
+
+          // Greedy Lane Allocation (stack parallel concurrent requests on separate vertical lanes)
+          const lanes = []; // stores end_time of last req in each lane
+          const laneHeight = 28;
+          const laneGap = 6;
+          const startY = 24;
+          const assignedLanes = [];
+
+          reqs.forEach(req => {
+            let placed = false;
+            for (let i = 0; i < lanes.length; i++) {
+              if (req.start_time >= lanes[i] + 0.1) {
+                lanes[i] = req.end_time || (now + 100);
+                assignedLanes.push(i);
+                placed = true;
+                break;
+              }
+            }
+            if (!placed) {
+              assignedLanes.push(lanes.length);
+              lanes.push(req.end_time || (now + 100));
+            }
+          });
+
+          // Draw Request Spans
+          renderedSpans = [];
+
+          reqs.forEach((req, idx) => {
+            const laneIdx = assignedLanes[idx] || 0;
+            const y = startY + (laneIdx * (laneHeight + laneGap));
+
+            if (y + laneHeight > height) return; // bounded within canvas height
+
+            const reqStart = req.start_time;
+            const reqEnd = req.end_time || now;
+
+            // X coordinates relative to minTime -> now
+            const x1 = Math.max(((reqStart - minTime) / windowSec) * width, -100);
+            const x2 = Math.min(((reqEnd - minTime) / windowSec) * width, width);
+            const spanW = Math.max(x2 - x1, 8);
+
+            if (x2 < 0 || x1 > width) return; // outside viewport
+
+            const isHovered = hoveredReq.value && (hoveredReq.value.id === req.id);
+            const isActive = req.status === 'active';
+
+            // Draw Bar Background Gradient
+            let grad = ctx.createLinearGradient(x1, y, x2, y);
+            if (isActive) {
+              grad.addColorStop(0, 'rgba(147, 51, 234, 0.95)'); // Purple
+              grad.addColorStop(1, 'rgba(99, 102, 241, 0.95)');  // Indigo
+            } else if (req.status === 200 || req.status === '200') {
+              grad.addColorStop(0, 'rgba(16, 185, 129, 0.9)');  // Emerald
+              grad.addColorStop(1, 'rgba(20, 184, 166, 0.85)'); // Teal
+            } else {
+              grad.addColorStop(0, 'rgba(225, 29, 72, 0.9)');   // Rose
+              grad.addColorStop(1, 'rgba(239, 68, 68, 0.85)');
+            }
+
+            // Rounded rectangle
+            const radius = 5;
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.roundRect(x1, y, spanW, laneHeight, radius);
+            ctx.fill();
+
+            // Border & Glow
+            if (isActive) {
+              ctx.strokeStyle = '#c084fc';
+              ctx.lineWidth = 1.5;
+              ctx.shadowColor = 'rgba(192, 132, 252, 0.5)';
+              ctx.shadowBlur = 8;
+              ctx.stroke();
+              ctx.shadowBlur = 0;
+            } else if (isHovered) {
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 1.5;
+              ctx.stroke();
+            } else {
+              ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+              ctx.lineWidth = 1;
+              ctx.stroke();
+            }
+
+            // Text Label inside Span
+            if (spanW > 40) {
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 10px "JetBrains Mono", monospace';
+              const modelLabel = req.model || 'qwen3.8-27b';
+              const tokLabel = req.prompt_tokens ? ` (${formatNumber(req.prompt_tokens)}/${req.completion_tokens}t)` : '';
+              const durLabel = ` • ${req.duration_ms}ms`;
+              const fullText = modelLabel + tokLabel + durLabel;
+
+              ctx.save();
+              ctx.beginPath();
+              ctx.rect(x1 + 4, y, spanW - 8, laneHeight);
+              ctx.clip();
+              ctx.fillText(fullText, x1 + 6, y + 17);
+              ctx.restore();
+            }
+
+            // Save hit target for mouse events
+            renderedSpans.push({
+              req,
+              rect: { x: x1, y, width: spanW, height: laneHeight }
+            });
+          });
+
+          ctx.restore();
+        };
+
+        const handleCanvasMouseMove = (e) => {
+          const canvas = timelineCanvas.value;
+          if (!canvas) return;
+          const rect = canvas.getBoundingClientRect();
+          mouseX.value = e.clientX - rect.left;
+          mouseY.value = e.clientY - rect.top;
+
+          const match = renderedSpans.find(s => 
+            mouseX.value >= s.rect.x && mouseX.value <= (s.rect.x + s.rect.width) &&
+            mouseY.value >= s.rect.y && mouseY.value <= (s.rect.y + s.rect.height)
+          );
+
+          hoveredReq.value = match ? match.req : null;
+        };
 
         const initChart = () => {
           const ctx = document.getElementById('throughputChart');
@@ -771,15 +877,15 @@
 
         const formatNumber = (num) => new Intl.NumberFormat().format(num || 0);
 
-        const formatMs = (ms) => {
-          if (!ms) return '0ms';
-          if (ms < 1000) return `${ms}ms`;
-          return `${(ms / 1000).toFixed(1)}s`;
-        };
-
         const formatTime = (epochSec) => {
           if (!epochSec) return '-';
           return new Date(epochSec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        };
+
+        const getStatusBadgeClass = (status) => {
+          if (status === 'active') return 'bg-purple-950 text-purple-300 border border-purple-800';
+          if (status === 200 || status === '200') return 'bg-emerald-950 text-emerald-300 border border-emerald-800';
+          return 'bg-rose-950 text-rose-300 border border-rose-800';
         };
 
         const getLogClass = (log) => {
@@ -793,8 +899,13 @@
         onMounted(() => {
           initChart();
           fetchStats();
-          setInterval(fetchStats, 1500);
+          startCanvasLoop();
+          setInterval(fetchStats, 1200);
           lucide.createIcons();
+        });
+
+        onUnmounted(() => {
+          if (animationFrameId) cancelAnimationFrame(animationFrameId);
         });
 
         return {
@@ -802,9 +913,10 @@
           isRefreshing,
           logFilter,
           timelineFilter,
-          timelineRequests,
-          timelineBounds,
+          timeWindowSec,
+          isTimelinePaused,
           hoveredReq,
+          timelineCanvas,
           filteredLogs,
           selectedModel,
           promptInput,
@@ -815,16 +927,14 @@
           curlSnippet,
           copyStatus,
           logBox,
+          tooltipPosStyle,
+          handleCanvasMouseMove,
           fetchStats,
           runPlayground,
           copyLogs,
           copyCurlSnippet,
           formatNumber,
-          formatMs,
           formatTime,
-          getSpanStyle,
-          getSpanBgClass,
-          getStatusDotClass,
           getStatusBadgeClass,
           getLogClass
         };
