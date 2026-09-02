@@ -61,8 +61,8 @@
     }
     /* Custom scrollbar */
     ::-webkit-scrollbar {
-      width: 5px;
-      height: 5px;
+      width: 6px;
+      height: 6px;
     }
     ::-webkit-scrollbar-track {
       background: #0a0f1d;
@@ -215,7 +215,7 @@
 
     </div>
 
-    <!-- LIFETIME TELEMETRY & TOTALS STATS STRIP (ZERO-OVERHEAD FROM /metrics) -->
+    <!-- LIFETIME TELEMETRY & TOTALS STATS STRIP -->
     <div class="glass-card rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-4 text-xs font-mono border border-slate-800/80 bg-slate-950/60">
       <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
         <div class="flex items-center gap-2">
@@ -247,39 +247,48 @@
 
       <div class="text-[11px] text-slate-500 flex items-center gap-1.5">
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-        <span>Zero-overhead engine counter</span>
+        <span>Zero-overhead engine metrics</span>
       </div>
     </div>
 
-    <!-- 60FPS STREAMING CANVAS TIMELINE WITH 82% "NOW" LINE -->
+    <!-- 60FPS STREAMING CANVAS TIMELINE (NO OVERLAY, CLEAN PARALLEL LANES & ZOOM) -->
     <div class="glass-card rounded-xl p-4 relative flex flex-col">
       <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
         <div class="flex items-center gap-2">
           <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
           <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
-            Concurrent Request Timeline (Streaming Waterfall)
+            Concurrent Request Timeline (Dedicated Parallel Lanes)
           </h2>
           <span class="text-[11px] font-mono text-emerald-400 bg-emerald-950/80 border border-emerald-800/50 px-2 py-0.5 rounded">
-            Live Stream (60 FPS)
+            {{ activeLanesCount }} Concurrent Lanes
           </span>
         </div>
 
-        <!-- Zoom Window Presets, Filters & Play/Pause -->
+        <!-- Controls: Time Zoom, Lane Height Density, Container Height & Pause -->
         <div class="flex flex-wrap items-center gap-3 text-xs font-mono">
           
-          <!-- Zoom Presets -->
+          <!-- Horizontal Time Zoom -->
           <div class="flex items-center gap-1 bg-slate-900 rounded-lg p-0.5 border border-slate-800 text-[11px]">
-            <span class="text-slate-500 px-1.5 text-[10px]">Zoom:</span>
+            <span class="text-slate-500 px-1.5 text-[10px]">Time:</span>
             <button v-for="w in [15, 30, 60, 120, 300]" :key="w" @click="timeWindowSec = w" :class="timeWindowSec === w ? 'bg-emerald-600 text-black font-bold' : 'text-slate-400 hover:text-white'" class="px-2 py-0.5 rounded transition">
               {{ w < 60 ? w + 's' : (w/60) + 'm' }}
             </button>
           </div>
 
-          <!-- Filter chips -->
-          <div class="flex items-center bg-slate-900 rounded-lg p-0.5 border border-slate-800 text-[11px]">
-            <button @click="timelineFilter = 'all'" :class="timelineFilter === 'all' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'" class="px-2 py-0.5 rounded">All</button>
-            <button @click="timelineFilter = 'active'" :class="timelineFilter === 'active' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'" class="px-2 py-0.5 rounded">Active</button>
-            <button @click="timelineFilter = '2xx'" :class="timelineFilter === '2xx' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'" class="px-2 py-0.5 rounded">2xx</button>
+          <!-- Vertical Lane Density (Row Height Zoom) -->
+          <div class="flex items-center gap-1 bg-slate-900 rounded-lg p-0.5 border border-slate-800 text-[11px]">
+            <span class="text-slate-500 px-1.5 text-[10px]">Row:</span>
+            <button @click="laneDensity = 14" :class="laneDensity === 14 ? 'bg-slate-700 text-emerald-400 font-bold' : 'text-slate-400 hover:text-white'" class="px-2 py-0.5 rounded transition" title="Tight (14px)">Tight</button>
+            <button @click="laneDensity = 18" :class="laneDensity === 18 ? 'bg-slate-700 text-emerald-400 font-bold' : 'text-slate-400 hover:text-white'" class="px-2 py-0.5 rounded transition" title="Normal (18px)">Normal</button>
+            <button @click="laneDensity = 26" :class="laneDensity === 26 ? 'bg-slate-700 text-emerald-400 font-bold' : 'text-slate-400 hover:text-white'" class="px-2 py-0.5 rounded transition" title="Spacious (26px)">Comfort</button>
+          </div>
+
+          <!-- Viewport Height Presets -->
+          <div class="flex items-center gap-1 bg-slate-900 rounded-lg p-0.5 border border-slate-800 text-[11px]">
+            <span class="text-slate-500 px-1.5 text-[10px]">View:</span>
+            <button @click="viewportHeight = 260" :class="viewportHeight === 260 ? 'bg-slate-700 text-white font-bold' : 'text-slate-400 hover:text-white'" class="px-1.5 py-0.5 rounded">260px</button>
+            <button @click="viewportHeight = 420" :class="viewportHeight === 420 ? 'bg-slate-700 text-white font-bold' : 'text-slate-400 hover:text-white'" class="px-1.5 py-0.5 rounded">420px</button>
+            <button @click="viewportHeight = 600" :class="viewportHeight === 600 ? 'bg-slate-700 text-white font-bold' : 'text-slate-400 hover:text-white'" class="px-1.5 py-0.5 rounded">Auto</button>
           </div>
 
           <!-- Pause/Resume Stream -->
@@ -290,17 +299,21 @@
         </div>
       </div>
 
-      <!-- Canvas Container (Fixed Height 260px with interactive overlay) -->
-      <div class="mt-3 relative w-full h-[260px] bg-dark-950/90 rounded-xl border border-slate-800/80 overflow-hidden select-none">
+      <!-- Scrollable Canvas Viewport (Never Overlays Rows, Auto-expands) -->
+      <div 
+        ref="canvasContainer"
+        class="mt-3 relative w-full bg-dark-950/90 rounded-xl border border-slate-800/80 overflow-y-auto overflow-x-hidden select-none"
+        :style="{ height: viewportHeight + 'px' }"
+      >
         <canvas 
           ref="timelineCanvas" 
-          class="w-full h-full block cursor-crosshair"
+          class="w-full block cursor-crosshair"
           @mousemove="handleCanvasMouseMove"
           @mouseleave="hoveredReq = null"
         ></canvas>
       </div>
 
-      <!-- Tooltip Popover (Matching sidebar.logsOverview style from screenshot) -->
+      <!-- Tooltip Popover (Matching screenshot) -->
       <div 
         v-if="hoveredReq" 
         class="absolute z-40 bg-dark-900/95 backdrop-blur-md border border-slate-700 rounded-xl p-3.5 shadow-2xl text-xs font-mono space-y-2 pointer-events-none w-72 transition-all duration-75"
@@ -342,31 +355,51 @@
 
     </div>
 
-    <!-- Main Workspace: Throughput Chart, Enlarged Logs & Speed Playground -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+    <!-- SEPARATE DUAL THROUGHPUT CHARTS (SPLIT INTO DEDICATED AUTOSCALING RATIOS) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       
-      <!-- Left 7 Cols: Chart & Enlarged Logs -->
-      <div class="lg:col-span-7 space-y-4">
-        
-        <!-- Throughput Chart Card (Compact height) -->
-        <div class="glass-card rounded-xl p-4">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <i data-lucide="line-chart" class="w-4 h-4 text-emerald-400"></i>
-              <h2 class="text-sm font-bold text-white">Throughput Timeline (Tokens / Sec)</h2>
-            </div>
-            <div class="flex items-center gap-3 text-xs font-mono">
-              <span class="flex items-center gap-1 text-emerald-400"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Generation</span>
-              <span class="flex items-center gap-1 text-blue-400"><span class="w-2 h-2 rounded-full bg-blue-400"></span> Prefill</span>
-            </div>
+      <!-- Chart 1: Generation Speed (Dedicated 0 .. 300 tok/s with responsive spikes) -->
+      <div class="glass-card rounded-xl p-4">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <i data-lucide="zap" class="w-4 h-4 text-emerald-400"></i>
+            <h2 class="text-sm font-bold text-white">Generation Speed Timeline</h2>
           </div>
-          <div class="h-44 w-full">
-            <canvas id="throughputChart"></canvas>
+          <div class="flex items-center gap-2 text-xs font-mono">
+            <span class="text-slate-400">Current:</span>
+            <span class="text-emerald-400 font-bold text-sm">{{ stats.engine?.gen_throughput_tps || 0 }} tok/s</span>
           </div>
         </div>
+        <div class="h-36 w-full">
+          <canvas id="genChart"></canvas>
+        </div>
+      </div>
 
-        <!-- Enlarged Live Journal & Request Logs -->
-        <div class="glass-card rounded-xl p-4">
+      <!-- Chart 2: Prompt Prefill Speed (Dedicated 0 .. 8000+ tok/s ratio) -->
+      <div class="glass-card rounded-xl p-4">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <i data-lucide="flame" class="w-4 h-4 text-blue-400"></i>
+            <h2 class="text-sm font-bold text-white">Prompt Prefill Speed Timeline</h2>
+          </div>
+          <div class="flex items-center gap-2 text-xs font-mono">
+            <span class="text-slate-400">Current:</span>
+            <span class="text-blue-400 font-bold text-sm">{{ stats.engine?.prompt_throughput_tps || 0 }} tok/s</span>
+          </div>
+        </div>
+        <div class="h-36 w-full">
+          <canvas id="prefillChart"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Main Workspace: Enlarged Logs & Speed Playground -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      
+      <!-- Left 7 Cols: Enlarged Live Journal & Request Logs -->
+      <div class="lg:col-span-7 space-y-4">
+        <div class="glass-card rounded-xl p-4 flex flex-col h-full">
           <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
             <div class="flex items-center gap-2">
               <i data-lucide="terminal" class="w-4 h-4 text-emerald-400"></i>
@@ -389,14 +422,13 @@
           </div>
 
           <!-- The Enlarged Logs Box -->
-          <div ref="logBox" class="bg-dark-950/90 rounded-xl p-3 font-mono text-[11px] text-slate-300 border border-slate-800/80 h-72 lg:h-80 overflow-y-auto space-y-1">
+          <div ref="logBox" class="bg-dark-950/90 rounded-xl p-3 font-mono text-[11px] text-slate-300 border border-slate-800/80 flex-1 min-h-[220px] max-h-72 overflow-y-auto space-y-1">
             <div v-if="filteredLogs.length === 0" class="text-slate-500 italic py-2 text-center">No matching log events in buffer...</div>
             <div v-for="(log, idx) in filteredLogs" :key="idx" class="leading-relaxed whitespace-pre-wrap break-all py-0.5" :class="getLogClass(log)">
               {{ log }}
             </div>
           </div>
         </div>
-
       </div>
 
       <!-- Right 5 Cols: Speed Playground & Model Management -->
@@ -426,7 +458,7 @@
                 <label class="text-[11px] font-semibold text-slate-400">Test Prompt</label>
                 <button type="button" @click="promptInput = 'Scrie o functie concisa in Rust pentru streaming HTTP cu reqwest.'" class="text-[10px] text-emerald-400 hover:underline font-mono">Example prompt</button>
               </div>
-              <textarea v-model="promptInput" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono resize-none transition" placeholder="Scrie promptul de testare..."></textarea>
+              <textarea v-model="promptInput" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono resize-none transition" placeholder="Scrie promptul de testare..."></textarea>
             </div>
 
             <!-- Parameters Bar -->
@@ -450,8 +482,8 @@
                   ⚡ {{ inferStats.tps }} tok/s • {{ inferStats.latencyMs }}ms ({{ inferStats.totalTokens }} tok)
                 </span>
               </div>
-              <div class="w-full flex-1 min-h-[190px] bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-200 overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                <span v-if="!inferOutput && !isInferring" class="text-slate-600 italic">Apasa pe Run Infer pentru a executa modelul live pe H100 cu calcul de tok/s...</span>
+              <div class="w-full flex-1 min-h-[140px] bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-xs text-slate-200 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                <span v-if="!inferOutput && !isInferring" class="text-slate-600 italic">Apasa pe Run Infer pentru a executa modelul live pe H100...</span>
                 <span>{{ inferOutput }}</span>
               </div>
             </div>
@@ -518,11 +550,15 @@
         const logFilter = ref('all');
         const timelineFilter = ref('all');
         const timeWindowSec = ref(30); // 30s past window
+        const laneDensity = ref(18); // Default row height (Tight: 14, Normal: 18, Comfort: 26)
+        const viewportHeight = ref(320); // Container height
+        const activeLanesCount = ref(1);
         const isTimelinePaused = ref(false);
         const hoveredReq = ref(null);
         const mouseX = ref(0);
         const mouseY = ref(0);
         const timelineCanvas = ref(null);
+        const canvasContainer = ref(null);
         const selectedModel = ref('qwen3.8-27b-clean-int4');
         const promptInput = ref("Scrie o functie scurta in Python de 2 linii.");
         const isInferring = ref(false);
@@ -532,7 +568,8 @@
         const copyStatus = ref("");
         const logBox = ref(null);
 
-        let chartInstance = null;
+        let genChartInstance = null;
+        let prefillChartInstance = null;
         let animationFrameId = null;
         const chartHistory = {
           labels: [],
@@ -540,7 +577,6 @@
           promptTps: []
         };
 
-        // Rendered span hit targets for mouse hover
         let renderedSpans = [];
 
         const filteredLogs = computed(() => {
@@ -570,7 +606,7 @@
   }'`;
         });
 
-        // 60FPS Continuous Canvas Animation Loop with 82% NOW Position
+        // 60FPS Continuous Canvas Animation Loop with No-Overlap Dynamic Lanes
         const startCanvasLoop = () => {
           const canvas = timelineCanvas.value;
           if (!canvas) return;
@@ -586,73 +622,20 @@
         };
 
         const drawTimeline = (canvas, ctx) => {
+          const container = canvasContainer.value;
           const rect = canvas.getBoundingClientRect();
           const dpr = window.devicePixelRatio || 1;
-          const width = rect.width;
-          const height = rect.height;
-
-          if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
-            canvas.width = width * dpr;
-            canvas.height = height * dpr;
-          }
-
-          ctx.save();
-          ctx.scale(dpr, dpr);
-
-          // Clear background
-          ctx.fillStyle = '#070b14';
-          ctx.fillRect(0, 0, width, height);
+          const width = container ? container.clientWidth : rect.width;
 
           const now = Date.now() / 1000;
-          const windowSec = timeWindowSec.value; // seconds represented between 0 and nowX
-          const nowX = width * 0.82; // NOW line is positioned at 82% of width
-          const pps = nowX / windowSec; // Pixels per second
+          const windowSec = timeWindowSec.value;
+          const nowX = width * 0.82; // NOW line at 82%
+          const pps = nowX / windowSec;
 
           const minTime = now - windowSec;
           const maxTime = now + (width - nowX) / pps;
 
-          // 1. Draw Alternating Lane Backgrounds
-          const laneHeight = 26;
-          const laneGap = 5;
-          const startY = 28;
-          const maxLanes = Math.floor((height - startY) / (laneHeight + laneGap));
-
-          for (let i = 0; i < maxLanes; i++) {
-            const ly = startY + (i * (laneHeight + laneGap));
-            ctx.fillStyle = i % 2 === 0 ? 'rgba(255, 255, 255, 0.015)' : 'rgba(255, 255, 255, 0.005)';
-            ctx.fillRect(0, ly, width, laneHeight);
-          }
-
-          // 2. Draw Time Grid & Markers
-          ctx.font = '10px "JetBrains Mono", monospace';
-          const gridStepSec = windowSec <= 15 ? 2.5 : (windowSec <= 30 ? 5 : (windowSec <= 60 ? 10 : (windowSec <= 120 ? 20 : 60)));
-          const firstGridTime = Math.ceil(minTime / gridStepSec) * gridStepSec;
-
-          for (let t = firstGridTime; t <= maxTime; t += gridStepSec) {
-            const x = nowX - (now - t) * pps;
-            if (x < 0 || x > width) continue;
-
-            const secAgo = Math.round(now - t);
-
-            // Grid Line
-            ctx.strokeStyle = (secAgo === 0) ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255, 255, 255, 0.06)';
-            ctx.lineWidth = 1;
-            ctx.setLineDash(secAgo === 0 ? [3, 2] : []);
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, height);
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Text Label
-            if (secAgo !== 0) {
-              ctx.fillStyle = '#64748b';
-              const label = secAgo > 0 ? `-${secAgo}s` : `+${Math.abs(secAgo)}s`;
-              ctx.fillText(label, x + 4, 16);
-            }
-          }
-
-          // 3. Fetch and filter timeline requests
+          // 1. Fetch and filter timeline requests
           const allReqs = stats.value.timeline || [];
           let reqs = allReqs.filter(r => {
             if (timelineFilter.value === 'active') return r.status === 'active';
@@ -663,8 +646,8 @@
           // Sort requests by start_time
           reqs = reqs.slice().sort((a, b) => a.start_time - b.start_time);
 
-          // Greedy Lane Packing
-          const lanes = [];
+          // 2. Strict Greedy Non-Overlapping Lane Allocation (sub sub sub)
+          const lanes = []; // stores end_time of last request placed in each lane
           const assignedLanes = [];
 
           reqs.forEach(req => {
@@ -683,52 +666,108 @@
             }
           });
 
-          // 4. Draw Request Spans
+          const totalLanes = Math.max(lanes.length, 1);
+          activeLanesCount.value = totalLanes;
+
+          // Dynamic Lane Height based on density setting
+          const laneHeight = laneDensity.value;
+          const laneGap = laneDensity.value <= 14 ? 3 : 4;
+          const startY = 26;
+
+          // Total required canvas height for all parallel rows
+          const calculatedHeight = Math.max(startY + (totalLanes * (laneHeight + laneGap)) + 20, viewportHeight.value);
+
+          if (canvas.width !== width * dpr || canvas.height !== calculatedHeight * dpr) {
+            canvas.width = width * dpr;
+            canvas.height = calculatedHeight * dpr;
+            canvas.style.height = `${calculatedHeight}px`;
+          }
+
+          ctx.save();
+          ctx.scale(dpr, dpr);
+
+          // Clear background
+          ctx.fillStyle = '#070b14';
+          ctx.fillRect(0, 0, width, calculatedHeight);
+
+          // 3. Draw Alternating Lane Row Backgrounds
+          for (let i = 0; i < totalLanes; i++) {
+            const ly = startY + (i * (laneHeight + laneGap));
+            ctx.fillStyle = i % 2 === 0 ? 'rgba(255, 255, 255, 0.015)' : 'rgba(255, 255, 255, 0.005)';
+            ctx.fillRect(0, ly, width, laneHeight);
+          }
+
+          // 4. Draw Time Grid & Markers
+          ctx.font = '10px "JetBrains Mono", monospace';
+          const gridStepSec = windowSec <= 15 ? 2.5 : (windowSec <= 30 ? 5 : (windowSec <= 60 ? 10 : (windowSec <= 120 ? 20 : 60)));
+          const firstGridTime = Math.ceil(minTime / gridStepSec) * gridStepSec;
+
+          for (let t = firstGridTime; t <= maxTime; t += gridStepSec) {
+            const x = nowX - (now - t) * pps;
+            if (x < 0 || x > width) continue;
+
+            const secAgo = Math.round(now - t);
+
+            ctx.strokeStyle = (secAgo === 0) ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255, 255, 255, 0.06)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash(secAgo === 0 ? [3, 2] : []);
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, calculatedHeight);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            if (secAgo !== 0) {
+              ctx.fillStyle = '#64748b';
+              const label = secAgo > 0 ? `-${secAgo}s` : `+${Math.abs(secAgo)}s`;
+              ctx.fillText(label, x + 4, 15);
+            }
+          }
+
+          // 5. Draw Request Spans (Each in its own clean lane!)
           renderedSpans = [];
 
           reqs.forEach((req, idx) => {
-            const laneIdx = (assignedLanes[idx] || 0) % maxLanes;
+            const laneIdx = assignedLanes[idx] || 0;
             const y = startY + (laneIdx * (laneHeight + laneGap));
 
             const reqStart = req.start_time;
             const reqEnd = req.end_time || now;
 
-            // X positions calculated from NOW line at nowX:
-            // x(t) = nowX - (now - t) * pps
             const x1 = nowX - (now - reqStart) * pps;
             const x2 = req.end_time ? (nowX - (now - reqEnd) * pps) : nowX;
-            const spanW = Math.max(x2 - x1, 6);
+            const spanW = Math.max(x2 - x1, 5);
 
-            if (x2 < -50 || x1 > width + 50) return; // outside canvas view
+            if (x2 < -50 || x1 > width + 50) return;
 
             const isHovered = hoveredReq.value && (hoveredReq.value.id === req.id);
             const isActive = req.status === 'active';
 
-            // Draw Bar Background Gradient
+            // Bar Gradient
             let grad = ctx.createLinearGradient(x1, y, x2, y);
             if (isActive) {
-              grad.addColorStop(0, 'rgba(147, 51, 234, 0.95)'); // Purple
-              grad.addColorStop(1, 'rgba(99, 102, 241, 0.95)');  // Indigo
+              grad.addColorStop(0, 'rgba(147, 51, 234, 0.95)');
+              grad.addColorStop(1, 'rgba(99, 102, 241, 0.95)');
             } else if (req.status === 200 || req.status === '200') {
-              grad.addColorStop(0, 'rgba(16, 185, 129, 0.9)');  // Emerald
-              grad.addColorStop(1, 'rgba(20, 184, 166, 0.85)'); // Teal
+              grad.addColorStop(0, 'rgba(16, 185, 129, 0.9)');
+              grad.addColorStop(1, 'rgba(20, 184, 166, 0.85)');
             } else {
-              grad.addColorStop(0, 'rgba(225, 29, 72, 0.9)');   // Rose
+              grad.addColorStop(0, 'rgba(225, 29, 72, 0.9)');
               grad.addColorStop(1, 'rgba(239, 68, 68, 0.85)');
             }
 
-            const radius = 4;
+            const radius = laneHeight <= 14 ? 2.5 : 4;
             ctx.fillStyle = grad;
             ctx.beginPath();
             ctx.roundRect(x1, y, spanW, laneHeight, radius);
             ctx.fill();
 
-            // Border & Glowing edge
+            // Border
             if (isActive) {
               ctx.strokeStyle = '#c084fc';
               ctx.lineWidth = 1.5;
               ctx.shadowColor = 'rgba(192, 132, 252, 0.6)';
-              ctx.shadowBlur = 8;
+              ctx.shadowBlur = 6;
               ctx.stroke();
               ctx.shadowBlur = 0;
             } else if (isHovered) {
@@ -741,20 +780,21 @@
               ctx.stroke();
             }
 
-            // Text Label inside Span
-            if (spanW > 35) {
+            // Text Label if wide enough
+            if (spanW > 30) {
               ctx.fillStyle = '#ffffff';
-              ctx.font = 'bold 10px "JetBrains Mono", monospace';
+              const fontSize = laneHeight <= 14 ? 9 : (laneHeight <= 18 ? 10 : 11);
+              ctx.font = `bold ${fontSize}px "JetBrains Mono", monospace`;
               const modelLabel = req.model || 'qwen3.8-27b';
-              const tokLabel = req.prompt_tokens ? ` (${formatNumber(req.prompt_tokens)}/${req.completion_tokens}t)` : '';
-              const durLabel = ` • ${req.duration_ms}ms`;
+              const tokLabel = (req.prompt_tokens && spanW > 70) ? ` (${formatNumber(req.prompt_tokens)}/${req.completion_tokens}t)` : '';
+              const durLabel = spanW > 50 ? ` • ${req.duration_ms}ms` : '';
               const fullText = modelLabel + tokLabel + durLabel;
 
               ctx.save();
               ctx.beginPath();
               ctx.rect(x1 + 3, y, spanW - 6, laneHeight);
               ctx.clip();
-              ctx.fillText(fullText, x1 + 5, y + 16);
+              ctx.fillText(fullText, x1 + 4, y + (laneHeight * 0.72));
               ctx.restore();
             }
 
@@ -765,21 +805,21 @@
             });
           });
 
-          // 5. Draw THE DISTINCT "NOW" VERTICAL GUIDELINE AT 82%
+          // 6. Draw NOW Guideline at 82%
           ctx.strokeStyle = '#10b981';
           ctx.lineWidth = 2;
           ctx.shadowColor = 'rgba(16, 185, 129, 0.8)';
-          ctx.shadowBlur = 10;
+          ctx.shadowBlur = 8;
           ctx.beginPath();
           ctx.moveTo(nowX, 0);
-          ctx.lineTo(nowX, height);
+          ctx.lineTo(nowX, calculatedHeight);
           ctx.stroke();
           ctx.shadowBlur = 0;
 
-          // "NOW" Badge on top of the line
+          // "NOW |" Badge at top of line
           ctx.fillStyle = '#10b981';
           ctx.beginPath();
-          ctx.roundRect(nowX - 22, 2, 44, 18, 4);
+          ctx.roundRect(nowX - 22, 2, 44, 17, 3);
           ctx.fill();
 
           ctx.fillStyle = '#000000';
@@ -804,61 +844,87 @@
           hoveredReq.value = match ? match.req : null;
         };
 
-        const initChart = () => {
-          const ctx = document.getElementById('throughputChart');
-          if (!ctx) return;
-
-          chartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-              labels: chartHistory.labels,
-              datasets: [
-                {
-                  label: 'Generation',
+        const initCharts = () => {
+          // 1. Generation Speed Chart (0 .. 300+ tok/s dedicated scale)
+          const genCtx = document.getElementById('genChart');
+          if (genCtx) {
+            genChartInstance = new Chart(genCtx, {
+              type: 'line',
+              data: {
+                labels: chartHistory.labels,
+                datasets: [{
+                  label: 'Generation (tok/s)',
                   data: chartHistory.genTps,
                   borderColor: '#10b981',
-                  backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
                   borderWidth: 2,
                   fill: true,
                   tension: 0.35,
                   pointRadius: 0
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                  x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                    ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 9 } }
+                  },
+                  y: {
+                    beginAtZero: true,
+                    suggestedMax: 200,
+                    grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                    ticks: { color: '#10b981', font: { family: 'JetBrains Mono', size: 9 } }
+                  }
                 },
-                {
-                  label: 'Prefill',
+                plugins: { legend: { display: false } }
+              }
+            });
+          }
+
+          // 2. Prefill Speed Chart (0 .. 8000+ tok/s dedicated scale)
+          const prefillCtx = document.getElementById('prefillChart');
+          if (prefillCtx) {
+            prefillChartInstance = new Chart(prefillCtx, {
+              type: 'line',
+              data: {
+                labels: chartHistory.labels,
+                datasets: [{
+                  label: 'Prefill (tok/s)',
                   data: chartHistory.promptTps,
                   borderColor: '#3b82f6',
-                  backgroundColor: 'rgba(59, 130, 246, 0.05)',
-                  borderWidth: 1.5,
-                  fill: false,
+                  backgroundColor: 'rgba(59, 130, 246, 0.12)',
+                  borderWidth: 2,
+                  fill: true,
                   tension: 0.35,
                   pointRadius: 0
-                }
-              ]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              animation: false,
-              scales: {
-                x: {
-                  grid: { color: 'rgba(255, 255, 255, 0.04)' },
-                  ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 9 } }
-                },
-                y: {
-                  beginAtZero: true,
-                  grid: { color: 'rgba(255, 255, 255, 0.04)' },
-                  ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 9 } }
-                }
+                }]
               },
-              plugins: {
-                legend: { display: false }
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                  x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                    ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 9 } }
+                  },
+                  y: {
+                    beginAtZero: true,
+                    suggestedMax: 3000,
+                    grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                    ticks: { color: '#3b82f6', font: { family: 'JetBrains Mono', size: 9 } }
+                  }
+                },
+                plugins: { legend: { display: false } }
               }
-            }
-          });
+            });
+          }
         };
 
-        const updateChart = (genTps, promptTps) => {
-          if (!chartInstance) return;
+        const updateCharts = (genTps, promptTps) => {
           const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
           chartHistory.labels.push(now);
           chartHistory.genTps.push(genTps);
@@ -870,7 +936,8 @@
             chartHistory.promptTps.shift();
           }
 
-          chartInstance.update();
+          if (genChartInstance) genChartInstance.update();
+          if (prefillChartInstance) prefillChartInstance.update();
         };
 
         const fetchStats = async (manual = false) => {
@@ -883,7 +950,7 @@
               if (data.engine?.models?.length && !selectedModel.value) {
                 selectedModel.value = data.engine.models[0];
               }
-              updateChart(data.engine?.gen_throughput_tps || 0, data.engine?.prompt_throughput_tps || 0);
+              updateCharts(data.engine?.gen_throughput_tps || 0, data.engine?.prompt_throughput_tps || 0);
             }
           } catch (e) {
             console.error("Stats fetch error:", e);
@@ -975,7 +1042,7 @@
         };
 
         onMounted(() => {
-          initChart();
+          initCharts();
           fetchStats();
           startCanvasLoop();
           setInterval(fetchStats, 1200);
@@ -992,9 +1059,13 @@
           logFilter,
           timelineFilter,
           timeWindowSec,
+          laneDensity,
+          viewportHeight,
+          activeLanesCount,
           isTimelinePaused,
           hoveredReq,
           timelineCanvas,
+          canvasContainer,
           filteredLogs,
           selectedModel,
           promptInput,
