@@ -215,13 +215,13 @@
 
     </div>
 
-    <!-- REAL-TIME 60FPS SMOOTH ROLLING CANVAS TIMELINE (WATERFALL) -->
+    <!-- 60FPS STREAMING CANVAS TIMELINE WITH 80% "NOW" LINE -->
     <div class="glass-card rounded-xl p-4 relative flex flex-col">
       <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
         <div class="flex items-center gap-2">
           <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
           <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
-            Real-Time Request Waterfall (Streaming Timeline)
+            Concurrent Request Timeline (Streaming Waterfall)
           </h2>
           <span class="text-[11px] font-mono text-emerald-400 bg-emerald-950/80 border border-emerald-800/50 px-2 py-0.5 rounded">
             Live Stream (60 FPS)
@@ -254,23 +254,17 @@
         </div>
       </div>
 
-      <!-- Canvas Container (Fixed Height with interactive overlay) -->
-      <div class="mt-3 relative w-full h-64 bg-dark-950/90 rounded-xl border border-slate-800/80 overflow-hidden select-none">
+      <!-- Canvas Container (Fixed Height 260px with interactive overlay) -->
+      <div class="mt-3 relative w-full h-[260px] bg-dark-950/90 rounded-xl border border-slate-800/80 overflow-hidden select-none">
         <canvas 
           ref="timelineCanvas" 
           class="w-full h-full block cursor-crosshair"
           @mousemove="handleCanvasMouseMove"
           @mouseleave="hoveredReq = null"
         ></canvas>
-
-        <!-- Right "NOW" indicator badge -->
-        <div class="absolute top-2 right-2 pointer-events-none flex items-center gap-1.5 bg-dark-900/90 border border-slate-800 px-2 py-0.5 rounded text-[10px] font-mono text-emerald-400">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>NOW</span>
-        </div>
       </div>
 
-      <!-- Tooltip Popover (Similar to Image 1) -->
+      <!-- Tooltip Popover (Matching sidebar.logsOverview style from screenshot) -->
       <div 
         v-if="hoveredReq" 
         class="absolute z-40 bg-dark-900/95 backdrop-blur-md border border-slate-700 rounded-xl p-3.5 shadow-2xl text-xs font-mono space-y-2 pointer-events-none w-72 transition-all duration-75"
@@ -487,7 +481,7 @@
         const isRefreshing = ref(false);
         const logFilter = ref('all');
         const timelineFilter = ref('all');
-        const timeWindowSec = ref(30); // 30s zoom window by default
+        const timeWindowSec = ref(30); // 30s past window
         const isTimelinePaused = ref(false);
         const hoveredReq = ref(null);
         const mouseX = ref(0);
@@ -522,7 +516,7 @@
 
         const tooltipPosStyle = computed(() => {
           return {
-            top: `${Math.min(Math.max(mouseY.value + 15, 10), 140)}px`,
+            top: `${Math.min(Math.max(mouseY.value + 15, 10), 160)}px`,
             left: `${Math.min(Math.max(mouseX.value + 15, 10), window.innerWidth - 320)}px`
           };
         });
@@ -540,7 +534,7 @@
   }'`;
         });
 
-        // 60FPS Continuous Canvas Animation Loop
+        // 60FPS Continuous Canvas Animation Loop with 80% NOW Position
         const startCanvasLoop = () => {
           const canvas = timelineCanvas.value;
           if (!canvas) return;
@@ -574,31 +568,55 @@
           ctx.fillRect(0, 0, width, height);
 
           const now = Date.now() / 1000;
-          const windowSec = timeWindowSec.value;
+          const windowSec = timeWindowSec.value; // seconds represented between 0 and nowX
+          const nowX = width * 0.82; // NOW line is positioned at ~82% of width
+          const pps = nowX / windowSec; // Pixels per second
+
           const minTime = now - windowSec;
+          const maxTime = now + (width - nowX) / pps;
 
-          // Draw Time Grid & Markers
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-          ctx.lineWidth = 1;
+          // 1. Draw Alternating Lane Backgrounds
+          const laneHeight = 26;
+          const laneGap = 5;
+          const startY = 28;
+          const maxLanes = Math.floor((height - startY) / (laneHeight + laneGap));
+
+          for (let i = 0; i < maxLanes; i++) {
+            const ly = startY + (i * (laneHeight + laneGap));
+            ctx.fillStyle = i % 2 === 0 ? 'rgba(255, 255, 255, 0.015)' : 'rgba(255, 255, 255, 0.005)';
+            ctx.fillRect(0, ly, width, laneHeight);
+          }
+
+          // 2. Draw Time Grid & Markers
           ctx.font = '10px "JetBrains Mono", monospace';
-          ctx.fillStyle = '#64748b';
-
-          const gridStepSec = windowSec <= 15 ? 2.5 : (windowSec <= 30 ? 5 : (windowSec <= 60 ? 10 : 30));
+          const gridStepSec = windowSec <= 15 ? 2.5 : (windowSec <= 30 ? 5 : (windowSec <= 60 ? 10 : (windowSec <= 120 ? 20 : 60)));
           const firstGridTime = Math.ceil(minTime / gridStepSec) * gridStepSec;
 
-          for (let t = firstGridTime; t <= now; t += gridStepSec) {
-            const x = ((t - minTime) / windowSec) * width;
+          for (let t = firstGridTime; t <= maxTime; t += gridStepSec) {
+            const x = nowX - (now - t) * pps;
+            if (x < 0 || x > width) continue;
+
+            const secAgo = Math.round(now - t);
+
+            // Grid Line
+            ctx.strokeStyle = (secAgo === 0) ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255, 255, 255, 0.06)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash(secAgo === 0 ? [3, 2] : []);
             ctx.beginPath();
             ctx.moveTo(x, 0);
             ctx.lineTo(x, height);
             ctx.stroke();
+            ctx.setLineDash([]);
 
-            const secAgo = Math.round(now - t);
-            const label = secAgo === 0 ? 'NOW' : `-${secAgo}s`;
-            ctx.fillText(label, x + 4, 14);
+            // Text Label
+            if (secAgo !== 0) {
+              ctx.fillStyle = '#64748b';
+              const label = secAgo > 0 ? `-${secAgo}s` : `+${Math.abs(secAgo)}s`;
+              ctx.fillText(label, x + 4, 16);
+            }
           }
 
-          // Fetch and filter timeline requests
+          // 3. Fetch and filter timeline requests
           const allReqs = stats.value.timeline || [];
           let reqs = allReqs.filter(r => {
             if (timelineFilter.value === 'active') return r.status === 'active';
@@ -609,17 +627,14 @@
           // Sort requests by start_time
           reqs = reqs.slice().sort((a, b) => a.start_time - b.start_time);
 
-          // Greedy Lane Allocation (stack parallel concurrent requests on separate vertical lanes)
-          const lanes = []; // stores end_time of last req in each lane
-          const laneHeight = 28;
-          const laneGap = 6;
-          const startY = 24;
+          // Greedy Lane Packing
+          const lanes = [];
           const assignedLanes = [];
 
           reqs.forEach(req => {
             let placed = false;
             for (let i = 0; i < lanes.length; i++) {
-              if (req.start_time >= lanes[i] + 0.1) {
+              if (req.start_time >= lanes[i] + 0.05) {
                 lanes[i] = req.end_time || (now + 100);
                 assignedLanes.push(i);
                 placed = true;
@@ -632,24 +647,23 @@
             }
           });
 
-          // Draw Request Spans
+          // 4. Draw Request Spans
           renderedSpans = [];
 
           reqs.forEach((req, idx) => {
-            const laneIdx = assignedLanes[idx] || 0;
+            const laneIdx = (assignedLanes[idx] || 0) % maxLanes;
             const y = startY + (laneIdx * (laneHeight + laneGap));
-
-            if (y + laneHeight > height) return; // bounded within canvas height
 
             const reqStart = req.start_time;
             const reqEnd = req.end_time || now;
 
-            // X coordinates relative to minTime -> now
-            const x1 = Math.max(((reqStart - minTime) / windowSec) * width, -100);
-            const x2 = Math.min(((reqEnd - minTime) / windowSec) * width, width);
-            const spanW = Math.max(x2 - x1, 8);
+            // X positions calculated from NOW line at nowX:
+            // x(t) = nowX - (now - t) * pps
+            const x1 = nowX - (now - reqStart) * pps;
+            const x2 = req.end_time ? (nowX - (now - reqEnd) * pps) : nowX;
+            const spanW = Math.max(x2 - x1, 6);
 
-            if (x2 < 0 || x1 > width) return; // outside viewport
+            if (x2 < -50 || x1 > width + 50) return; // outside canvas view
 
             const isHovered = hoveredReq.value && (hoveredReq.value.id === req.id);
             const isActive = req.status === 'active';
@@ -667,18 +681,17 @@
               grad.addColorStop(1, 'rgba(239, 68, 68, 0.85)');
             }
 
-            // Rounded rectangle
-            const radius = 5;
+            const radius = 4;
             ctx.fillStyle = grad;
             ctx.beginPath();
             ctx.roundRect(x1, y, spanW, laneHeight, radius);
             ctx.fill();
 
-            // Border & Glow
+            // Border & Glowing edge
             if (isActive) {
               ctx.strokeStyle = '#c084fc';
               ctx.lineWidth = 1.5;
-              ctx.shadowColor = 'rgba(192, 132, 252, 0.5)';
+              ctx.shadowColor = 'rgba(192, 132, 252, 0.6)';
               ctx.shadowBlur = 8;
               ctx.stroke();
               ctx.shadowBlur = 0;
@@ -693,7 +706,7 @@
             }
 
             // Text Label inside Span
-            if (spanW > 40) {
+            if (spanW > 35) {
               ctx.fillStyle = '#ffffff';
               ctx.font = 'bold 10px "JetBrains Mono", monospace';
               const modelLabel = req.model || 'qwen3.8-27b';
@@ -703,9 +716,9 @@
 
               ctx.save();
               ctx.beginPath();
-              ctx.rect(x1 + 4, y, spanW - 8, laneHeight);
+              ctx.rect(x1 + 3, y, spanW - 6, laneHeight);
               ctx.clip();
-              ctx.fillText(fullText, x1 + 6, y + 17);
+              ctx.fillText(fullText, x1 + 5, y + 16);
               ctx.restore();
             }
 
@@ -715,6 +728,27 @@
               rect: { x: x1, y, width: spanW, height: laneHeight }
             });
           });
+
+          // 5. Draw THE DISTINCT "NOW" VERTICAL GUIDELINE AT 82%
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 2;
+          ctx.shadowColor = 'rgba(16, 185, 129, 0.8)';
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.moveTo(nowX, 0);
+          ctx.lineTo(nowX, height);
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+
+          // "NOW" Badge on top of the line
+          ctx.fillStyle = '#10b981';
+          ctx.beginPath();
+          ctx.roundRect(nowX - 22, 2, 44, 18, 4);
+          ctx.fill();
+
+          ctx.fillStyle = '#000000';
+          ctx.font = 'bold 10px "JetBrains Mono", monospace';
+          ctx.fillText('NOW |', nowX - 16, 14);
 
           ctx.restore();
         };
