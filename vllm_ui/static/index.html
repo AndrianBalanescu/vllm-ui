@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>vLLM H100 • Live Telemetry & Control Center</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Vue 3 Global -->
+  <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              400: '#34d399',
+              500: '#10b981',
+              600: '#059669',
+            },
+            dark: {
+              950: '#06090f',
+              900: '#0a0f1d',
+              850: '#0f172a',
+              800: '#131e36',
+              750: '#1a2642',
+              700: '#233252',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #06090f;
+      color: #f1f5f9;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .glass-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+    .glass-card:hover {
+      border-color: rgba(16, 185, 129, 0.35);
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0a0f1d;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #10b981;
+    }
+  </style>
+</head>
+<body class="min-h-screen antialiased selection:bg-emerald-500 selection:text-black">
+  <div id="app" class="max-w-[1700px] mx-auto p-4 sm:p-5 lg:p-6 space-y-4">
+    
+    <!-- Top Header & Appliance Status Bar -->
+    <header class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-950/60">
+          <i data-lucide="zap" class="w-5 h-5 text-black font-bold"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2.5">
+            <h1 class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
+              vLLM Telemetry & Control
+            </h1>
+            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-800/50">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              NVIDIA H100 80GB
+            </span>
+          </div>
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 font-mono mt-0.5">
+            <span>Tailscale: <strong class="text-slate-200">100.117.104.94</strong></span>
+            <span class="text-slate-600">•</span>
+            <span>262k Ctx</span>
+            <span class="text-slate-600">•</span>
+            <span>INT4-MTP BF16</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Services Status Pills & Global Controls -->
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Service 1: vLLM -->
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-xs font-mono">
+          <span class="w-2 h-2 rounded-full" :class="stats.services?.vllm === 'online' ? 'bg-emerald-400' : 'bg-rose-500'"></span>
+          <span class="text-slate-300">vLLM</span>
+          <span class="text-slate-500 text-[10px]">:8000</span>
+        </div>
+
+        <!-- Service 2: FastEmbed CPU -->
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-xs font-mono">
+          <span class="w-2 h-2 rounded-full" :class="stats.services?.fastembed_cpu === 'online' ? 'bg-emerald-400' : 'bg-rose-500'"></span>
+          <span class="text-slate-300">FastEmbed (28 vCPU)</span>
+          <span class="text-slate-500 text-[10px]">:8002</span>
+        </div>
+
+        <!-- Service 3: iBrowse -->
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-xs font-mono">
+          <span class="w-2 h-2 rounded-full" :class="stats.services?.ibrowse === 'online' ? 'bg-emerald-400' : 'bg-rose-500'"></span>
+          <span class="text-slate-300">iBrowse</span>
+          <span class="text-slate-500 text-[10px]">:3000</span>
+        </div>
+
+        <!-- cURL Modal Trigger -->
+        <button @click="showCurlModal = true" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 border border-slate-700 text-xs font-mono transition">
+          <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
+          <span>cURL / API</span>
+        </button>
+
+        <!-- Refresh Button -->
+        <button @click="fetchStats(true)" class="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition border border-slate-700" title="Refresh">
+          <i data-lucide="rotate-cw" class="w-3.5 h-3.5" :class="{'animate-spin': isRefreshing}"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Compact Key Stats Cards Grid (4 Column Dense Layout) -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      
+      <!-- Card 1: Throughput tok/s -->
+      <div class="glass-card rounded-xl p-3.5 transition-all duration-200">
+        <div class="flex items-center justify-between text-slate-400 mb-1">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Generation Speed</span>
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-emerald-400"></i>
+        </div>
+        <div class="flex items-baseline gap-1.5">
+          <span class="text-2xl font-extrabold font-mono text-white">{{ stats.engine?.gen_throughput_tps || 0 }}</span>
+          <span class="text-[11px] font-mono text-emerald-400 font-bold">tok/s</span>
+        </div>
+        <div class="mt-2 flex items-center justify-between text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/80">
+          <span>Prefill Speed:</span>
+          <span class="text-slate-200 font-semibold">{{ stats.engine?.prompt_throughput_tps || 0 }} tok/s</span>
+        </div>
+      </div>
+
+      <!-- Card 2: KV Cache Memory Pool -->
+      <div class="glass-card rounded-xl p-3.5 transition-all duration-200">
+        <div class="flex items-center justify-between text-slate-400 mb-1">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">KV Cache Pool</span>
+          <span class="text-[10px] font-mono text-slate-400">{{ formatNumber(stats.engine?.used_kv_slots || 0) }} / 1.55M tok</span>
+        </div>
+        <div class="flex items-baseline gap-1.5">
+          <span class="text-2xl font-extrabold font-mono text-white">{{ stats.engine?.kv_cache_usage_pct || 0 }}%</span>
+          <span class="text-[11px] text-slate-400">allocated</span>
+        </div>
+        <div class="mt-2 w-full bg-slate-800/90 rounded-full h-1.5 overflow-hidden">
+          <div class="bg-gradient-to-r from-blue-500 to-emerald-400 h-1.5 rounded-full transition-all duration-300" :style="{ width: (stats.engine?.kv_cache_usage_pct || 0) + '%' }"></div>
+        </div>
+      </div>
+
+      <!-- Card 3: Cache Hit & Concurrency -->
+      <div class="glass-card rounded-xl p-3.5 transition-all duration-200">
+        <div class="flex items-center justify-between text-slate-400 mb-1">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Prefix Hit & MTP</span>
+          <span class="text-[10px] font-mono font-semibold" :class="(stats.engine?.running_requests || 0) > 0 ? 'text-emerald-400' : 'text-slate-500'">
+            {{ stats.engine?.running_requests || 0 }} running
+          </span>
+        </div>
+        <div class="flex items-baseline gap-3">
+          <div>
+            <span class="text-xl font-bold font-mono text-white">{{ stats.engine?.prefix_cache_hit_pct || 0 }}%</span>
+            <span class="text-[10px] text-slate-400 font-mono ml-1">prefix</span>
+          </div>
+          <div class="h-6 w-[1px] bg-slate-800"></div>
+          <div>
+            <span class="text-xl font-bold font-mono text-emerald-400">{{ stats.engine?.spec_acceptance_pct || 85 }}%</span>
+            <span class="text-[10px] text-slate-400 font-mono ml-1">MTP</span>
+          </div>
+        </div>
+        <div class="mt-2 flex items-center justify-between text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/80">
+          <span>Queue state:</span>
+          <span class="text-slate-200">{{ stats.engine?.waiting_requests || 0 }} waiting in queue</span>
+        </div>
+      </div>
+
+      <!-- Card 4: Hardware VRAM & Temp -->
+      <div class="glass-card rounded-xl p-3.5 transition-all duration-200">
+        <div class="flex items-center justify-between text-slate-400 mb-1">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">H100 Hardware</span>
+          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold" :class="(stats.gpu?.temp_c || 0) > 85 ? 'bg-rose-950 text-rose-400' : 'bg-emerald-950 text-emerald-400'">
+            {{ stats.gpu?.temp_c || 0 }}°C
+          </span>
+        </div>
+        <div class="flex items-baseline gap-1.5">
+          <span class="text-2xl font-extrabold font-mono text-white">{{ Math.round((stats.gpu?.mem_used_mb || 79435)/1024) }}</span>
+          <span class="text-[11px] text-slate-400 font-mono">/ {{ Math.round((stats.gpu?.mem_total_mb || 81559)/1024) }} GB VRAM</span>
+        </div>
+        <div class="mt-2 flex items-center justify-between text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/80">
+          <span>GPU Load / Power:</span>
+          <span class="text-slate-200 font-semibold">{{ stats.gpu?.util_percent || 0 }}% • {{ Math.round(stats.gpu?.power_draw_w || 0) }}W</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Main Workspace: Throughput Chart, Enlarged Logs & Speed Playground -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      
+      <!-- Left 7 Cols: Chart & Enlarged Logs -->
+      <div class="lg:col-span-7 space-y-4">
+        
+        <!-- Throughput Chart Card (Compact height) -->
+        <div class="glass-card rounded-xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <i data-lucide="line-chart" class="w-4 h-4 text-emerald-400"></i>
+              <h2 class="text-sm font-bold text-white">Throughput Timeline</h2>
+            </div>
+            <div class="flex items-center gap-3 text-xs font-mono">
+              <span class="flex items-center gap-1 text-emerald-400"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Generation tok/s</span>
+              <span class="flex items-center gap-1 text-blue-400"><span class="w-2 h-2 rounded-full bg-blue-400"></span> Prefill tok/s</span>
+            </div>
+          </div>
+          <div class="h-44 w-full">
+            <canvas id="throughputChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Enlarged Live Journal & Request Logs (Bigger Container) -->
+        <div class="glass-card rounded-xl p-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2">
+              <i data-lucide="terminal" class="w-4 h-4 text-emerald-400"></i>
+              <h2 class="text-sm font-bold text-white">Live Engine Journal & Stream</h2>
+              <span class="text-[11px] font-mono text-slate-500">({{ filteredLogs.length }} events)</span>
+            </div>
+
+            <!-- Filter Chips & Actions -->
+            <div class="flex items-center gap-1.5">
+              <div class="flex items-center bg-slate-900 rounded-lg p-0.5 border border-slate-800 text-[11px] font-mono">
+                <button @click="logFilter = 'all'" :class="logFilter === 'all' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'" class="px-2 py-0.5 rounded">All</button>
+                <button @click="logFilter = 'engine'" :class="logFilter === 'engine' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'" class="px-2 py-0.5 rounded">Stats</button>
+                <button @click="logFilter = 'reqs'" :class="logFilter === 'reqs' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'" class="px-2 py-0.5 rounded">POSTs</button>
+              </div>
+
+              <button @click="copyLogs" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition text-xs" title="Copy Logs">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- The Enlarged Logs Box (Height 72/80 for great visibility) -->
+          <div ref="logBox" class="bg-dark-950/90 rounded-xl p-3 font-mono text-[11px] text-slate-300 border border-slate-800/80 h-72 lg:h-80 overflow-y-auto space-y-1">
+            <div v-if="filteredLogs.length === 0" class="text-slate-500 italic py-2 text-center">No matching log events in buffer...</div>
+            <div v-for="(log, idx) in filteredLogs" :key="idx" class="leading-relaxed whitespace-pre-wrap break-all py-0.5" :class="getLogClass(log)">
+              {{ log }}
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right 5 Cols: Speed Playground & Model Management -->
+      <div class="lg:col-span-5 space-y-4">
+        
+        <div class="glass-card rounded-xl p-4 flex flex-col h-full">
+          
+          <!-- Playground Header & Model Dropdown -->
+          <div class="flex items-center justify-between gap-2 mb-3 pb-3 border-b border-slate-800">
+            <div class="flex items-center gap-2">
+              <i data-lucide="play-circle" class="w-4 h-4 text-emerald-400"></i>
+              <h2 class="text-sm font-bold text-white">Interactive Playground</h2>
+            </div>
+            
+            <!-- Dynamic Model Selector -->
+            <div class="flex items-center gap-1.5">
+              <span class="text-[11px] font-mono text-slate-400">Model:</span>
+              <select v-model="selectedModel" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-emerald-400 font-mono focus:outline-none focus:border-emerald-500">
+                <option v-for="m in (stats.engine?.models || ['qwen3.8-27b-clean-int4'])" :key="m" :value="m">{{ m }}</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Prompt Form -->
+          <form @submit.prevent="runPlayground" class="space-y-3 flex-1 flex flex-col">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-[11px] font-semibold text-slate-400">Test Prompt</label>
+                <button type="button" @click="promptInput = 'Scrie un benchmark concis in Rust pentru streaming HTTP cu reqwest.'" class="text-[10px] text-emerald-400 hover:underline font-mono">Example prompt</button>
+              </div>
+              <textarea v-model="promptInput" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono resize-none transition" placeholder="Scrie promptul de testare..."></textarea>
+            </div>
+
+            <!-- Parameters Bar -->
+            <div class="flex items-center justify-between text-xs font-mono text-slate-400 bg-slate-900/60 p-2 rounded-lg border border-slate-800/80">
+              <div class="flex items-center gap-3">
+                <span>Max: <strong class="text-slate-200">128 tok</strong></span>
+                <span>Temp: <strong class="text-slate-200">0.3</strong></span>
+              </div>
+              <button type="submit" :disabled="isInferring || !promptInput" class="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-black font-bold text-xs flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md">
+                <i data-lucide="play" class="w-3 h-3 fill-current"></i>
+                <span v-if="!isInferring">Run Infer</span>
+                <span v-else>Running...</span>
+              </button>
+            </div>
+
+            <!-- Response & Speed Meter Box -->
+            <div class="flex-1 flex flex-col">
+              <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1 font-mono">
+                <span>Response Output:</span>
+                <span v-if="inferStats.totalTokens > 0" class="text-emerald-400 font-bold bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/50">
+                  ⚡ {{ inferStats.tps }} tok/s • {{ inferStats.latencyMs }}ms ({{ inferStats.totalTokens }} tok)
+                </span>
+              </div>
+              <div class="w-full flex-1 min-h-[190px] bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-200 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                <span v-if="!inferOutput && !isInferring" class="text-slate-600 italic">Apasa pe Run Infer pentru a executa modelul live pe H100 cu calcul de tok/s...</span>
+                <span>{{ inferOutput }}</span>
+              </div>
+            </div>
+
+          </form>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- cURL / Integration Modal -->
+    <div v-if="showCurlModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-dark-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-5 space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <i data-lucide="terminal" class="w-5 h-5 text-emerald-400"></i>
+            <h3 class="text-base font-bold text-white">API Integration & cURL Snippets</h3>
+          </div>
+          <button @click="showCurlModal = false" class="text-slate-400 hover:text-white p-1">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Available Models from /v1/models -->
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs font-mono space-y-1">
+          <div class="text-slate-400">Modele active raportate de <code class="text-emerald-400">/v1/models</code>:</div>
+          <div class="flex flex-wrap gap-1.5 pt-1">
+            <span v-for="m in stats.engine?.models" :key="m" class="px-2 py-0.5 rounded bg-slate-800 text-emerald-400 border border-slate-700">
+              {{ m }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Tab selection for cURL / Python -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">cURL Request (OpenAI Compatible)</span>
+            <button @click="copyCurlSnippet" class="text-xs text-emerald-400 hover:underline flex items-center gap-1 font-mono">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>{{ copyStatus || 'Copy cURL' }}</span>
+            </button>
+          </div>
+          <pre class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs font-mono text-emerald-300 overflow-x-auto whitespace-pre leading-relaxed">{{ curlSnippet }}</pre>
+        </div>
+
+        <div class="flex justify-end pt-2">
+          <button @click="showCurlModal = false" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Vue 3 App Implementation -->
+  <script>
+    const { createApp, ref, computed, onMounted, nextTick } = Vue;
+
+    createApp({
+      setup() {
+        const stats = ref({});
+        const isRefreshing = ref(false);
+        const logFilter = ref('all');
+        const selectedModel = ref('qwen3.8-27b-clean-int4');
+        const promptInput = ref("Scrie o functie scurta in Python de 2 linii.");
+        const isInferring = ref(false);
+        const inferOutput = ref("");
+        const inferStats = ref({ totalTokens: 0, tps: 0, latencyMs: 0 });
+        const showCurlModal = ref(false);
+        const copyStatus = ref("");
+        const logBox = ref(null);
+
+        let chartInstance = null;
+        const chartHistory = {
+          labels: [],
+          genTps: [],
+          promptTps: []
+        };
+
+        const filteredLogs = computed(() => {
+          const logs = stats.value.recent_logs || [];
+          if (logFilter.value === 'engine') return logs.filter(l => l.includes('Engine 000:'));
+          if (logFilter.value === 'reqs') return logs.filter(l => l.includes('POST /v1/chat/completions'));
+          return logs;
+        });
+
+        const curlSnippet = computed(() => {
+          const model = selectedModel.value || 'qwen3.8-27b-clean-int4';
+          return `curl -X POST http://100.117.104.94:8000/v1/chat/completions \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer supersecretdev" \\
+  -d '{
+    "model": "${model}",
+    "messages": [{"role": "user", "content": "Salut!"}],
+    "temperature": 0.3,
+    "max_tokens": 128
+  }'`;
+        });
+
+        const initChart = () => {
+          const ctx = document.getElementById('throughputChart');
+          if (!ctx) return;
+
+          chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: chartHistory.labels,
+              datasets: [
+                {
+                  label: 'Generation',
+                  data: chartHistory.genTps,
+                  borderColor: '#10b981',
+                  backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                  borderWidth: 2,
+                  fill: true,
+                  tension: 0.35,
+                  pointRadius: 0
+                },
+                {
+                  label: 'Prefill',
+                  data: chartHistory.promptTps,
+                  borderColor: '#3b82f6',
+                  backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                  borderWidth: 1.5,
+                  fill: false,
+                  tension: 0.35,
+                  pointRadius: 0
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: false,
+              scales: {
+                x: {
+                  grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                  ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 9 } }
+                },
+                y: {
+                  beginAtZero: true,
+                  grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                  ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 9 } }
+                }
+              },
+              plugins: {
+                legend: { display: false }
+              }
+            }
+          });
+        };
+
+        const updateChart = (genTps, promptTps) => {
+          if (!chartInstance) return;
+          const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          chartHistory.labels.push(now);
+          chartHistory.genTps.push(genTps);
+          chartHistory.promptTps.push(promptTps);
+
+          if (chartHistory.labels.length > 25) {
+            chartHistory.labels.shift();
+            chartHistory.genTps.shift();
+            chartHistory.promptTps.shift();
+          }
+
+          chartInstance.update();
+        };
+
+        const fetchStats = async (manual = false) => {
+          if (manual) isRefreshing.value = true;
+          try {
+            const res = await fetch('/api/stats');
+            if (res.ok) {
+              const data = await res.json();
+              stats.value = data;
+              if (data.engine?.models?.length && !selectedModel.value) {
+                selectedModel.value = data.engine.models[0];
+              }
+              updateChart(data.engine?.gen_throughput_tps || 0, data.engine?.prompt_throughput_tps || 0);
+            }
+          } catch (e) {
+            console.error("Stats fetch error:", e);
+          } finally {
+            if (manual) isRefreshing.value = false;
+            nextTick(() => lucide.createIcons());
+          }
+        };
+
+        const runPlayground = async () => {
+          if (!promptInput.value || isInferring.value) return;
+          isInferring.value = true;
+          inferOutput.value = "";
+          inferStats.value = { totalTokens: 0, tps: 0, latencyMs: 0 };
+          const startTime = performance.now();
+
+          try {
+            const res = await fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: selectedModel.value || 'qwen3.8-27b-clean-int4',
+                messages: [{ role: 'user', content: promptInput.value }],
+                max_tokens: 128,
+                temperature: 0.3
+              })
+            });
+
+            if (res.ok) {
+              const data = await res.json();
+              const elapsedSec = (performance.now() - startTime) / 1000;
+              const content = data.choices?.[0]?.message?.content || "";
+              const completionTokens = data.usage?.completion_tokens || 0;
+              inferOutput.value = content;
+              inferStats.value = {
+                totalTokens: completionTokens,
+                tps: Math.round(completionTokens / Math.max(elapsedSec, 0.01)),
+                latencyMs: Math.round(elapsedSec * 1000)
+              };
+            } else {
+              inferOutput.value = `[Error ${res.status}]: ${await res.text()}`;
+            }
+          } catch (e) {
+            inferOutput.value = `[Request Failed]: ${e.message}`;
+          } finally {
+            isInferring.value = false;
+            fetchStats();
+          }
+        };
+
+        const copyLogs = () => {
+          const text = (stats.value.recent_logs || []).join("\n");
+          navigator.clipboard.writeText(text);
+        };
+
+        const copyCurlSnippet = () => {
+          navigator.clipboard.writeText(curlSnippet.value);
+          copyStatus.value = "Copied!";
+          setTimeout(() => { copyStatus.value = ""; }, 2000);
+        };
+
+        const formatNumber = (num) => new Intl.NumberFormat().format(num);
+
+        const getLogClass = (log) => {
+          if (log.includes('Engine 000:')) return 'text-emerald-400 font-semibold';
+          if (log.includes('SpecDecoding')) return 'text-blue-400';
+          if (log.includes('POST /v1/chat/completions')) return 'text-slate-300';
+          if (log.includes('ERROR') || log.includes('Exception')) return 'text-rose-400';
+          return 'text-slate-400';
+        };
+
+        onMounted(() => {
+          initChart();
+          fetchStats();
+          setInterval(fetchStats, 2000);
+          lucide.createIcons();
+        });
+
+        return {
+          stats,
+          isRefreshing,
+          logFilter,
+          filteredLogs,
+          selectedModel,
+          promptInput,
+          isInferring,
+          inferOutput,
+          inferStats,
+          showCurlModal,
+          curlSnippet,
+          copyStatus,
+          logBox,
+          fetchStats,
+          runPlayground,
+          copyLogs,
+          copyCurlSnippet,
+          formatNumber,
+          getLogClass
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

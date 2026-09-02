@@ -1,0 +1,33 @@
+{
+  "name": "vllm-ui",
+  "version": "0.1.0",
+  "description": "Zero-dependency, real-time Vue 3 Web UI & Telemetry Dashboard for vLLM & Local LLMs",
+  "main": "bin/vllm-ui.js",
+  "bin": {
+    "vllm-ui": "./bin/vllm-ui.js"
+  },
+  "keywords": [
+    "vllm",
+    "dashboard",
+    "telemetry",
+    "llm",
+    "gpu",
+    "vue3",
+    "h100",
+    "a100",
+    "metrics",
+    "throughput",
+    "openai"
+  ],
+  "author": "Andrian Balanescu",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "bin",
+    "vllm_ui",
+    "README.md",
+    "LICENSE"
+  ]
+}

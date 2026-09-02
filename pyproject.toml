@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vllm-ui"
+version = "0.1.0"
+description = "Zero-dependency, real-time Vue 3 Web UI & Telemetry Dashboard for vLLM & Local LLMs"
+readme = "README.md"
+authors = [{ name = "Andrian Balanescu" }]
+license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.8"
+dependencies = []
+
+[project.scripts]
+vllm-ui = "vllm_ui.server:main"
+vllm-dash = "vllm_ui.server:main"
+
+[tool.setuptools.packages.find]
+include = ["vllm_ui*"]
+
+[tool.setuptools.package-data]
+"vllm_ui" = ["static/*"]
