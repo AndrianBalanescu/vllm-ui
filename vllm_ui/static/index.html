@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>vLLM H100 • Live Telemetry & Control Center</title>
+  <title>vLLM • Live Telemetry & Control Dashboard</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Vue 3 Global -->
@@ -92,15 +92,15 @@
             </h1>
             <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-800/50">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              NVIDIA H100 80GB
+              {{ stats.gpu?.name || 'GPU Engine' }}
             </span>
           </div>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 font-mono mt-0.5">
-            <span>Tailscale: <strong class="text-slate-200">100.117.104.94</strong></span>
+            <span>Model: <strong class="text-slate-200">{{ stats.engine?.active_model || 'vLLM' }}</strong></span>
             <span class="text-slate-600">•</span>
-            <span>262k Ctx</span>
+            <span>Ctx: {{ formatNumber(stats.engine?.max_model_len || 262144) }}</span>
             <span class="text-slate-600">•</span>
-            <span>INT4-MTP BF16</span>
+            <span>MTP / Spec: {{ stats.engine?.spec_acceptance_pct || 87 }}%</span>
           </div>
         </div>
       </div>
@@ -108,21 +108,9 @@
       <!-- Services Status Pills & Global Controls -->
       <div class="flex flex-wrap items-center gap-2">
         <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-xs font-mono">
-          <span class="w-2 h-2 rounded-full" :class="stats.services?.vllm === 'online' ? 'bg-emerald-400' : 'bg-rose-500'"></span>
+          <span class="w-2 h-2 rounded-full" :class="stats.engine?.status === 'online' ? 'bg-emerald-400' : 'bg-rose-500'"></span>
           <span class="text-slate-300">vLLM Engine</span>
           <span class="text-slate-500 text-[10px]">:8000</span>
-        </div>
-
-        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-xs font-mono">
-          <span class="w-2 h-2 rounded-full" :class="stats.services?.fastembed_cpu === 'online' ? 'bg-emerald-400' : 'bg-rose-500'"></span>
-          <span class="text-slate-300">FastEmbed</span>
-          <span class="text-slate-500 text-[10px]">:8002</span>
-        </div>
-
-        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-xs font-mono">
-          <span class="w-2 h-2 rounded-full" :class="stats.services?.ibrowse === 'online' ? 'bg-emerald-400' : 'bg-rose-500'"></span>
-          <span class="text-slate-300">iBrowse</span>
-          <span class="text-slate-500 text-[10px]">:3000</span>
         </div>
 
         <button @click="showCurlModal = true" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 border border-slate-700 text-xs font-mono transition">
@@ -198,14 +186,14 @@
       <!-- Card 4: Hardware VRAM & Temp -->
       <div class="glass-card rounded-xl p-3.5 transition-all duration-200">
         <div class="flex items-center justify-between text-slate-400 mb-1">
-          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">H100 Hardware</span>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Hardware VRAM</span>
           <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold" :class="(stats.gpu?.temp_c || 0) > 85 ? 'bg-rose-950 text-rose-400' : 'bg-emerald-950 text-emerald-400'">
             {{ stats.gpu?.temp_c || 0 }}°C
           </span>
         </div>
         <div class="flex items-baseline gap-1.5">
           <span class="text-2xl font-extrabold font-mono text-white">{{ Math.round((stats.gpu?.mem_used_mb || 79435)/1024) }}</span>
-          <span class="text-[11px] text-slate-400 font-mono">/ {{ Math.round((stats.gpu?.mem_total_mb || 81559)/1024) }} GB VRAM</span>
+          <span class="text-[11px] text-slate-400 font-mono">/ {{ Math.round((stats.gpu?.mem_total_mb || 81559)/1024) }} GB</span>
         </div>
         <div class="mt-2 flex items-center justify-between text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/80">
           <span>GPU Load / Power:</span>
