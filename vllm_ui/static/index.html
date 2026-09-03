@@ -434,7 +434,7 @@
             <div class="flex items-center gap-1.5">
               <span class="text-[11px] font-mono text-slate-400">Model:</span>
               <select v-model="selectedModel" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-emerald-400 font-mono focus:outline-none focus:border-emerald-500">
-                <option v-for="m in (stats.engine?.models || ['qwen3.8-27b-clean-int4'])" :key="m" :value="m">{{ m }}</option>
+                <option v-for="m in (stats.engine?.models || ['default'])" :key="m" :value="m">{{ m }}</option>
               </select>
             </div>
           </div>
@@ -547,7 +547,7 @@
         const mouseY = ref(0);
         const timelineCanvas = ref(null);
         const canvasContainer = ref(null);
-        const selectedModel = ref('qwen3.8-27b-clean-int4');
+        const selectedModel = ref('');
         const promptInput = ref("Scrie o functie scurta in Python de 2 linii.");
         const isInferring = ref(false);
         const inferOutput = ref("");
@@ -582,13 +582,14 @@
         });
 
         const curlSnippet = computed(() => {
-          const model = selectedModel.value || 'qwen3.8-27b-clean-int4';
-          return `curl -X POST http://100.117.104.94:8000/v1/chat/completions \\
+          const model = selectedModel.value || stats.value.engine?.active_model || 'default-model';
+          const host = window.location.hostname || '127.0.0.1';
+          return `curl -X POST http://${host}:8000/v1/chat/completions \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer supersecretdev" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{
     "model": "${model}",
-    "messages": [{"role": "user", "content": "Salut!"}],
+    "messages": [{"role": "user", "content": "Hello!"}],
     "temperature": 0.3,
     "max_tokens": 128
   }'`;
@@ -773,7 +774,7 @@
               ctx.fillStyle = '#ffffff';
               const fontSize = laneHeight <= 14 ? 9 : (laneHeight <= 18 ? 10 : 11);
               ctx.font = `bold ${fontSize}px "JetBrains Mono", monospace`;
-              const modelLabel = req.model || 'qwen3.8-27b';
+              const modelLabel = req.model || stats.value.engine?.active_model || 'model';
               const tokLabel = (req.prompt_tokens && spanW > 70) ? ` (${formatNumber(req.prompt_tokens)}/${req.completion_tokens}t)` : '';
               const durLabel = spanW > 50 ? ` • ${req.duration_ms}ms` : '';
               const fullText = modelLabel + tokLabel + durLabel;
@@ -960,7 +961,7 @@
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                model: selectedModel.value || 'qwen3.8-27b-clean-int4',
+                model: selectedModel.value || stats.value.engine?.active_model || 'default',
                 messages: [{ role: 'user', content: promptInput.value }],
                 max_tokens: 128,
                 temperature: 0.3
