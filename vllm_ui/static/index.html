@@ -96,11 +96,11 @@
             </span>
           </div>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 font-mono mt-0.5">
-            <span>Model: <strong class="text-slate-200">{{ stats.engine?.active_model || 'vLLM' }}</strong></span>
-            <span class="text-slate-600">•</span>
-            <span>Ctx: {{ formatNumber(stats.engine?.max_model_len || 262144) }}</span>
-            <span class="text-slate-600">•</span>
-            <span>MTP / Spec: {{ stats.engine?.spec_acceptance_pct || 87 }}%</span>
+            <span>Model: <strong class="text-slate-200">{{ stats.engine?.active_model || '--' }}</strong></span>
+            <span class="text-slate-600" v-if="stats.engine?.max_model_len">•</span>
+            <span v-if="stats.engine?.max_model_len">Ctx: {{ formatNumber(stats.engine.max_model_len) }}</span>
+            <span class="text-slate-600" v-if="stats.engine?.spec_acceptance_pct !== null && stats.engine?.spec_acceptance_pct !== undefined">•</span>
+            <span v-if="stats.engine?.spec_acceptance_pct !== null && stats.engine?.spec_acceptance_pct !== undefined">MTP / Spec: {{ stats.engine.spec_acceptance_pct }}%</span>
           </div>
         </div>
       </div>
@@ -147,7 +147,7 @@
       <div class="glass-card rounded-xl p-3.5 transition-all duration-200">
         <div class="flex items-center justify-between text-slate-400 mb-1">
           <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">KV Cache Pool</span>
-          <span class="text-[10px] font-mono text-slate-400">{{ formatNumber(stats.engine?.used_kv_slots || 0) }} / 1.55M tok</span>
+          <span class="text-[10px] font-mono text-slate-400">GPU Cache Factor</span>
         </div>
         <div class="flex items-baseline gap-1.5">
           <span class="text-2xl font-extrabold font-mono text-white">{{ stats.engine?.kv_cache_usage_pct || 0 }}%</span>
@@ -171,9 +171,9 @@
             <span class="text-xl font-bold font-mono text-white">{{ stats.engine?.prefix_cache_hit_pct || 0 }}%</span>
             <span class="text-[10px] text-slate-400 font-mono ml-1">prefix</span>
           </div>
-          <div class="h-6 w-[1px] bg-slate-800"></div>
-          <div>
-            <span class="text-xl font-bold font-mono text-emerald-400">{{ stats.engine?.spec_acceptance_pct || 85 }}%</span>
+          <div class="h-6 w-[1px] bg-slate-800" v-if="stats.engine?.spec_acceptance_pct !== null && stats.engine?.spec_acceptance_pct !== undefined"></div>
+          <div v-if="stats.engine?.spec_acceptance_pct !== null && stats.engine?.spec_acceptance_pct !== undefined">
+            <span class="text-xl font-bold font-mono text-emerald-400">{{ stats.engine.spec_acceptance_pct }}%</span>
             <span class="text-[10px] text-slate-400 font-mono ml-1">MTP</span>
           </div>
         </div>
@@ -192,8 +192,8 @@
           </span>
         </div>
         <div class="flex items-baseline gap-1.5">
-          <span class="text-2xl font-extrabold font-mono text-white">{{ Math.round((stats.gpu?.mem_used_mb || 79435)/1024) }}</span>
-          <span class="text-[11px] text-slate-400 font-mono">/ {{ Math.round((stats.gpu?.mem_total_mb || 81559)/1024) }} GB</span>
+          <span class="text-2xl font-extrabold font-mono text-white">{{ Math.round((stats.gpu?.mem_used_mb || 0)/1024) }}</span>
+          <span class="text-[11px] text-slate-400 font-mono">/ {{ Math.round((stats.gpu?.mem_total_mb || 0)/1024) }} GB</span>
         </div>
         <div class="mt-2 flex items-center justify-between text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/80">
           <span>GPU Load / Power:</span>
@@ -219,15 +219,15 @@
 
         <div class="flex items-center gap-2">
           <span class="text-slate-500 uppercase tracking-wider text-[10px] font-bold">Avg TTFT:</span>
-          <span class="text-teal-400 font-semibold">{{ stats.totals?.avg_ttft_ms || 45 }} ms</span>
+          <span class="text-teal-400 font-semibold">{{ stats.totals?.avg_ttft_ms ? stats.totals.avg_ttft_ms + ' ms' : '--' }}</span>
         </div>
 
         <div class="flex items-center gap-2">
           <span class="text-slate-500 uppercase tracking-wider text-[10px] font-bold">Avg Latency:</span>
-          <span class="text-blue-400 font-semibold">{{ stats.totals?.avg_latency_ms ? formatNumber(stats.totals.avg_latency_ms) : 850 }} ms</span>
+          <span class="text-blue-400 font-semibold">{{ stats.totals?.avg_latency_ms ? formatNumber(stats.totals.avg_latency_ms) + ' ms' : '--' }}</span>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2" v-if="(stats.totals?.total_draft_tokens || 0) > 0">
           <span class="text-slate-500 uppercase tracking-wider text-[10px] font-bold">MTP Draft Accepted:</span>
           <span class="text-purple-400 font-semibold">{{ formatCompactNumber(stats.totals?.accepted_draft_tokens || 0) }} tok</span>
         </div>
