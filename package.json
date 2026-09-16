@@ -1,0 +1,8 @@
+{
+  "devDependencies": {
+    "tailwindcss": "^3.4.19"
+  },
+  "scripts": {
+    "build": "npx tailwindcss -i vllm_ui/static/input.css -o vllm_ui/static/tailwind.css --minify"
+  }
+}
