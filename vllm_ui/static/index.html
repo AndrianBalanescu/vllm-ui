@@ -607,7 +607,7 @@
           const ctx = canvas.getContext('2d');
 
           const render = () => {
-            if (!isTimelinePaused.value) {
+            if (!isTimelinePaused.value && !document.hidden) {
               drawTimeline(canvas, ctx);
             }
             animationFrameId = requestAnimationFrame(render);
@@ -937,6 +937,7 @@
         let lastStatsSuccess = Date.now();
 
         const fetchStats = async (manual = false) => {
+          if (!manual && document.hidden) return;
           if (manual) isRefreshing.value = true;
           try {
             const res = await fetch('/api/stats');
@@ -1044,7 +1045,7 @@
           initCharts();
           fetchStats();
           startCanvasLoop();
-          window._statsInterval = setInterval(fetchStats, 1200);
+          window._statsInterval = setInterval(fetchStats, 2000);
           lucide.createIcons();
         });
 
