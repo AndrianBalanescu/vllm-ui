@@ -376,7 +376,7 @@
             <div class="h-3 w-[1px] bg-slate-800"></div>
             <div title="Peak generation speed in this window">
               <span class="text-slate-400">Peak: </span>
-              <span class="text-white font-bold">{{ genWindowPeak }} tok/s</span>
+              <span class="text-white font-bold">{{ genWindowPeak || stats.engine?.peak_gen_tps || stats.engine?.gen_throughput_tps || 0 }} tok/s</span>
             </div>
           </div>
         </div>
@@ -405,12 +405,12 @@
             <div class="h-3 w-[1px] bg-slate-800"></div>
             <div title="Average prefill speed during prompt ingestion bursts">
               <span class="text-slate-400">Burst Avg: </span>
-              <span class="text-blue-300 font-semibold">{{ formatCompactNumber(prefillWindowAvg) }} tok/s</span>
+              <span class="text-blue-300 font-semibold">{{ formatCompactNumber(prefillWindowAvg || stats.engine?.prompt_throughput_tps || 0) }} tok/s</span>
             </div>
             <div class="h-3 w-[1px] bg-slate-800"></div>
             <div title="Peak prefill speed in this window">
               <span class="text-slate-400">Peak: </span>
-              <span class="text-cyan-300 font-bold">{{ formatCompactNumber(prefillWindowPeak) }} tok/s</span>
+              <span class="text-cyan-300 font-bold">{{ formatCompactNumber(prefillWindowPeak || stats.engine?.peak_prompt_tps || stats.engine?.prompt_throughput_tps || 0) }} tok/s</span>
             </div>
           </div>
         </div>

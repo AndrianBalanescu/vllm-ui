@@ -224,12 +224,14 @@ def get_models_list():
 _last_sample_time = time.time()
 _last_gen_tokens = 0
 _last_prompt_tokens = 0
+_peak_prompt_tps = 0.0
+_peak_gen_tps = 0.0
 
 _cache_lock = threading.Lock()
 _stats_cache = {"timestamp": 0.0, "data": None}
 
 def _build_stats():
-    global _last_sample_time, _last_gen_tokens, _last_prompt_tokens
+    global _last_sample_time, _last_gen_tokens, _last_prompt_tokens, _peak_prompt_tps, _peak_gen_tps
 
     gpu = get_gpu_stats()
     metrics_raw = ""
@@ -321,14 +323,21 @@ def _build_stats():
             m_g = re.search(r"Avg generation throughput:\s*([\d.]+)", l)
             m_kv = re.search(r"GPU KV cache usage:\s*([\d.]+)%", l)
             m_pre = re.search(r"Prefix cache hit rate:\s*([\d.]+)%", l)
-            if m_p: instant_prompt_tps = float(m_p.group(1))
-            if m_g: instant_gen_tps = float(m_g.group(1))
+            if m_p and float(m_p.group(1)) > 0 and instant_prompt_tps == 0:
+                instant_prompt_tps = float(m_p.group(1))
+            if m_g and float(m_g.group(1)) > 0 and instant_gen_tps == 0:
+                instant_gen_tps = float(m_g.group(1))
             if m_kv: instant_kv_pct = float(m_kv.group(1))
             if m_pre: instant_prefix_pct = float(m_pre.group(1))
             break
 
     models, max_model_len = get_models_info()
     active_model = models[0] if models else "vLLM"
+
+    if instant_prompt_tps > _peak_prompt_tps:
+        _peak_prompt_tps = instant_prompt_tps
+    if instant_gen_tps > _peak_gen_tps:
+        _peak_gen_tps = instant_gen_tps
 
     tracker.sync_engine_slots(running, default_model=active_model)
     timeline = tracker.get_timeline()
@@ -352,6 +361,8 @@ def _build_stats():
             "waiting_requests": int(waiting),
             "gen_throughput_tps": round(instant_gen_tps, 1),
             "prompt_throughput_tps": round(instant_prompt_tps, 1),
+            "peak_gen_tps": round(_peak_gen_tps, 1),
+            "peak_prompt_tps": round(_peak_prompt_tps, 1),
             "kv_cache_usage_pct": round(instant_kv_pct, 1),
             "prefix_cache_hit_pct": round(instant_prefix_pct, 1),
             "spec_acceptance_pct": spec_acceptance_pct,
