@@ -17,34 +17,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-            mono: ['"JetBrains Mono"', 'monospace'],
-          },
-          colors: {
-            brand: {
-              400: '#34d399',
-              500: '#10b981',
-              600: '#059669',
-            },
-            dark: {
-              950: '#06090f',
-              900: '#0a0f1d',
-              850: '#0f172a',
-              800: '#131e36',
-              750: '#1a2642',
-              700: '#233252',
-            }
-          }
-        }
-      }
-    }
-  </script>
+
   <style>
     body {
       background-color: #06090f;
@@ -130,38 +103,38 @@
     </header>
 
     <!-- LIFETIME TELEMETRY & TOTALS STATS STRIP (PROMINENT TOP BANNER) -->
-    <div class="glass-card rounded-2xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-4 font-mono border border-slate-700/60 bg-slate-900/90 shadow-xl shadow-black/50">
-      <div class="flex flex-wrap items-center gap-x-8 gap-y-2.5">
-        <div class="flex items-center gap-2.5">
-          <span class="text-slate-400 uppercase tracking-wider text-xs font-bold">Total Requests:</span>
-          <span class="text-white text-base font-extrabold bg-slate-800/90 px-3 py-0.5 rounded-lg border border-slate-700 shadow-sm">{{ formatNumber(stats.totals?.total_requests || 0) }}</span>
+    <div class="glass-card rounded-2xl px-4 sm:px-5 py-3 sm:py-3.5 font-mono border border-slate-700/60 bg-slate-900/90 shadow-xl shadow-black/50">
+      <div class="flex flex-wrap items-center gap-x-6 gap-y-2 sm:gap-x-10">
+        <div class="flex items-center gap-2 sm:gap-2.5">
+          <span class="text-slate-400 uppercase tracking-wider text-xs font-bold">Requests:</span>
+          <span class="text-white text-base font-extrabold bg-slate-800/90 px-2.5 sm:px-3 py-0.5 rounded-lg border border-slate-700 shadow-sm tabular-nums min-w-[64px] text-center">{{ formatNumber(stats.totals?.total_requests || 0) }}</span>
         </div>
 
-        <div class="flex items-center gap-2.5">
-          <span class="text-slate-400 uppercase tracking-wider text-xs font-bold">Total Tokens:</span>
-          <span class="text-emerald-400 text-base font-extrabold tracking-tight">{{ formatCompactNumber(stats.totals?.total_tokens || 0) }}</span>
-          <span class="text-slate-400 text-xs font-medium">({{ formatCompactNumber(stats.totals?.total_prompt_tokens || 0) }} prompt / {{ formatCompactNumber(stats.totals?.total_gen_tokens || 0) }} gen)</span>
+        <div class="flex items-center gap-2 sm:gap-2.5">
+          <span class="text-slate-400 uppercase tracking-wider text-xs font-bold">Tokens:</span>
+          <span class="text-emerald-400 text-base font-extrabold tracking-tight tabular-nums min-w-[56px] text-right">{{ formatCompactNumber(stats.totals?.total_tokens || 0) }}</span>
+          <span class="text-slate-500 text-[11px] font-medium tabular-nums hidden sm:inline">({{ formatCompactNumber(stats.totals?.total_prompt_tokens || 0) }}p / {{ formatCompactNumber(stats.totals?.total_gen_tokens || 0) }}g)</span>
         </div>
 
-        <div class="flex items-center gap-2">
-          <span class="text-slate-400 uppercase tracking-wider text-xs font-bold">Avg TTFT:</span>
-          <span class="text-teal-300 text-sm font-bold">{{ stats.totals?.avg_ttft_ms ? stats.totals.avg_ttft_ms + ' ms' : '--' }}</span>
+        <div class="flex items-center gap-2 sm:gap-2.5">
+          <span class="text-slate-400 uppercase tracking-wider text-xs font-bold">TTFT:</span>
+          <span class="text-teal-300 text-base font-bold tabular-nums min-w-[64px] text-right">{{ stats.totals?.avg_ttft_ms ? formatMs(stats.totals.avg_ttft_ms) : '--' }}</span>
         </div>
 
-        <div class="flex items-center gap-2">
-          <span class="text-slate-400 uppercase tracking-wider text-xs font-bold">Avg Latency:</span>
-          <span class="text-blue-300 text-sm font-bold">{{ stats.totals?.avg_latency_ms ? formatNumber(stats.totals.avg_latency_ms) + ' ms' : '--' }}</span>
+        <div class="flex items-center gap-2 sm:gap-2.5">
+          <span class="text-slate-400 uppercase tracking-wider text-xs font-bold">Latency:</span>
+          <span class="text-blue-300 text-base font-bold tabular-nums min-w-[64px] text-right">{{ stats.totals?.avg_latency_ms ? formatMs(stats.totals.avg_latency_ms) : '--' }}</span>
         </div>
 
-        <div class="flex items-center gap-2" v-if="stats.totals?.accepted_draft_tokens">
-          <span class="text-slate-400 uppercase tracking-wider text-xs font-bold">MTP Draft Accepted:</span>
-          <span class="text-emerald-400 text-sm font-bold">{{ formatCompactNumber(stats.totals.accepted_draft_tokens) }} tok</span>
+        <div class="flex items-center gap-2 sm:gap-2.5" v-if="stats.totals?.accepted_draft_tokens">
+          <span class="text-slate-400 uppercase tracking-wider text-xs font-bold hidden md:inline">MTP Draft:</span>
+          <span class="text-emerald-400 text-base font-bold tabular-nums min-w-[56px] text-right">{{ formatCompactNumber(stats.totals.accepted_draft_tokens) }}</span>
         </div>
       </div>
 
-      <div class="flex items-center gap-2 text-xs text-slate-400 font-semibold">
+      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-semibold mt-2.5 pt-2.5 border-t border-slate-800/60">
         <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span class="text-slate-300">Zero-overhead engine metrics</span>
+        <span>Zero-overhead engine metrics</span>
       </div>
     </div>
 
@@ -175,12 +148,12 @@
           <i data-lucide="zap" class="w-3.5 h-3.5 text-emerald-400"></i>
         </div>
         <div class="flex items-baseline gap-1.5">
-          <span class="text-2xl font-extrabold font-mono text-white">{{ stats.engine?.gen_throughput_tps || 0 }}</span>
+          <span class="text-2xl font-extrabold font-mono text-white tabular-nums min-w-[84px]">{{ formatTps(stats.engine?.gen_throughput_tps || 0) }}</span>
           <span class="text-[11px] font-mono text-emerald-400 font-bold">tok/s</span>
         </div>
         <div class="mt-2 flex items-center justify-between text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/80">
           <span>Prefill Speed:</span>
-          <span class="text-slate-200 font-semibold">{{ stats.engine?.prompt_throughput_tps || 0 }} tok/s</span>
+          <span class="text-slate-200 font-semibold tabular-nums">{{ formatTps(stats.engine?.prompt_throughput_tps || 0) }} tok/s</span>
         </div>
       </div>
 
@@ -191,7 +164,7 @@
           <span class="text-[10px] font-mono text-slate-400">GPU Cache Factor</span>
         </div>
         <div class="flex items-baseline gap-1.5">
-          <span class="text-2xl font-extrabold font-mono text-white">{{ stats.engine?.kv_cache_usage_pct || 0 }}%</span>
+          <span class="text-2xl font-extrabold font-mono text-white tabular-nums">{{ stats.engine?.kv_cache_usage_pct || 0 }}%</span>
           <span class="text-[11px] text-slate-400">allocated</span>
         </div>
         <div class="mt-2 w-full bg-slate-800/90 rounded-full h-1.5 overflow-hidden">
@@ -209,18 +182,18 @@
         </div>
         <div class="flex items-baseline gap-3">
           <div>
-            <span class="text-xl font-bold font-mono text-white">{{ stats.engine?.prefix_cache_hit_pct || 0 }}%</span>
+            <span class="text-xl font-bold font-mono text-white tabular-nums">{{ stats.engine?.prefix_cache_hit_pct || 0 }}%</span>
             <span class="text-[10px] text-slate-400 font-mono ml-1">prefix</span>
           </div>
           <div class="h-6 w-[1px] bg-slate-800" v-if="stats.engine?.spec_acceptance_pct !== null && stats.engine?.spec_acceptance_pct !== undefined"></div>
           <div v-if="stats.engine?.spec_acceptance_pct !== null && stats.engine?.spec_acceptance_pct !== undefined">
-            <span class="text-xl font-bold font-mono text-emerald-400">{{ stats.engine.spec_acceptance_pct }}%</span>
+            <span class="text-xl font-bold font-mono text-emerald-400 tabular-nums">{{ stats.engine.spec_acceptance_pct }}%</span>
             <span class="text-[10px] text-slate-400 font-mono ml-1">MTP</span>
           </div>
         </div>
         <div class="mt-2 flex items-center justify-between text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/80">
           <span>Queue state:</span>
-          <span class="text-slate-200">{{ stats.engine?.waiting_requests || 0 }} waiting in queue</span>
+          <span class="text-slate-200 tabular-nums">{{ stats.engine?.waiting_requests || 0 }} waiting in queue</span>
         </div>
       </div>
 
@@ -233,12 +206,12 @@
           </span>
         </div>
         <div class="flex items-baseline gap-1.5">
-          <span class="text-2xl font-extrabold font-mono text-white">{{ Math.round((stats.gpu?.mem_used_mb || 0)/1024) }}</span>
-          <span class="text-[11px] text-slate-400 font-mono">/ {{ Math.round((stats.gpu?.mem_total_mb || 0)/1024) }} GB</span>
+          <span class="text-2xl font-extrabold font-mono text-white tabular-nums">{{ Math.round((stats.gpu?.mem_used_mb || 0)/1024) }}</span>
+          <span class="text-[11px] text-slate-400 font-mono tabular-nums">/ {{ Math.round((stats.gpu?.mem_total_mb || 0)/1024) }} GB</span>
         </div>
         <div class="mt-2 flex items-center justify-between text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/80">
           <span>GPU Load / Power:</span>
-          <span class="text-slate-200 font-semibold">{{ stats.gpu?.util_percent || 0 }}% • {{ Math.round(stats.gpu?.power_draw_w || 0) }}W</span>
+          <span class="text-slate-200 font-semibold tabular-nums">{{ stats.gpu?.util_percent || 0 }}% • {{ Math.round(stats.gpu?.power_draw_w || 0) }}W</span>
         </div>
       </div>
 
@@ -364,19 +337,19 @@
             </div>
           </div>
           <div class="flex items-center gap-2.5 text-xs font-mono">
-            <div>
-              <span class="text-slate-400">Now: </span>
-              <span class="text-emerald-400 font-bold text-sm">{{ stats.engine?.gen_throughput_tps || 0 }} tok/s</span>
+            <div class="flex items-center justify-end gap-1.5">
+              <span class="text-slate-400">Now:</span>
+              <span class="text-emerald-400 font-bold text-sm tabular-nums w-[72px] text-right">{{ formatTps(stats.engine?.gen_throughput_tps || 0) }} tok/s</span>
             </div>
             <div class="h-3 w-[1px] bg-slate-800"></div>
-            <div title="Average generation speed during active output generation in this window">
-              <span class="text-slate-400">Avg: </span>
-              <span class="text-emerald-300 font-semibold">{{ genWindowAvg }} tok/s</span>
+            <div class="flex items-center justify-end gap-1.5" title="Time-weighted average generation speed over the last ~60s">
+              <span class="text-slate-400">Avg:</span>
+              <span class="text-emerald-300 font-semibold tabular-nums w-[72px] text-right">{{ formatTps(genWindowAvg) }} tok/s</span>
             </div>
             <div class="h-3 w-[1px] bg-slate-800"></div>
-            <div title="Peak generation speed in this window">
-              <span class="text-slate-400">Peak: </span>
-              <span class="text-white font-bold">{{ genWindowPeak || stats.engine?.peak_gen_tps || stats.engine?.gen_throughput_tps || 0 }} tok/s</span>
+            <div class="flex items-center justify-end gap-1.5" title="Peak generation speed in this window">
+              <span class="text-slate-400">Peak:</span>
+              <span class="text-white font-bold tabular-nums w-[72px] text-right">{{ formatTps(genWindowPeak || stats.engine?.peak_gen_tps || stats.engine?.gen_throughput_tps || 0) }} tok/s</span>
             </div>
           </div>
         </div>
@@ -398,19 +371,19 @@
             </div>
           </div>
           <div class="flex items-center gap-2.5 text-xs font-mono">
-            <div>
-              <span class="text-slate-400">Now: </span>
-              <span class="text-blue-400 font-bold text-sm">{{ stats.engine?.prompt_throughput_tps || 0 }} tok/s</span>
+            <div class="flex items-center justify-end gap-1.5">
+              <span class="text-slate-400">Now:</span>
+              <span class="text-blue-400 font-bold text-sm tabular-nums w-[72px] text-right">{{ formatTps(stats.engine?.prompt_throughput_tps || 0) }} tok/s</span>
             </div>
             <div class="h-3 w-[1px] bg-slate-800"></div>
-            <div title="Average prefill speed during prompt ingestion bursts">
-              <span class="text-slate-400">Burst Avg: </span>
-              <span class="text-blue-300 font-semibold">{{ formatCompactNumber(prefillWindowAvg || stats.engine?.prompt_throughput_tps || 0) }} tok/s</span>
+            <div class="flex items-center justify-end gap-1.5" title="Time-weighted average prefill speed during prompt ingestion over the last ~60s">
+              <span class="text-slate-400">Burst Avg:</span>
+              <span class="text-blue-300 font-semibold tabular-nums w-[72px] text-right">{{ formatTps(prefillWindowAvg || stats.engine?.prompt_throughput_tps || 0) }} tok/s</span>
             </div>
             <div class="h-3 w-[1px] bg-slate-800"></div>
-            <div title="Peak prefill speed in this window">
-              <span class="text-slate-400">Peak: </span>
-              <span class="text-cyan-300 font-bold">{{ formatCompactNumber(prefillWindowPeak || stats.engine?.peak_prompt_tps || stats.engine?.prompt_throughput_tps || 0) }} tok/s</span>
+            <div class="flex items-center justify-end gap-1.5" title="Peak prefill speed in this window">
+              <span class="text-slate-400">Peak:</span>
+              <span class="text-cyan-300 font-bold tabular-nums w-[72px] text-right">{{ formatTps(prefillWindowPeak || stats.engine?.peak_prompt_tps || stats.engine?.prompt_throughput_tps || 0) }} tok/s</span>
             </div>
           </div>
         </div>
@@ -598,32 +571,45 @@
         let genChartInstance = null;
         let prefillChartInstance = null;
         let animationFrameId = null;
-        const genWindowAvg = computed(() => {
-          const vals = chartHistory.genTps.filter(v => v > 0);
-          if (!vals.length) return 0;
-          return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
-        });
+        const WINDOW_AVG_SECONDS = 60;
 
-        const genWindowPeak = computed(() => {
-          if (!chartHistory.genTps.length) return 0;
-          return Math.round(Math.max(...chartHistory.genTps));
-        });
-
-        const prefillWindowAvg = computed(() => {
-          const vals = chartHistory.promptTps.filter(v => v > 0);
-          if (!vals.length) return 0;
-          return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
-        });
-
-        const prefillWindowPeak = computed(() => {
-          if (!chartHistory.promptTps.length) return 0;
-          return Math.round(Math.max(...chartHistory.promptTps));
-        });
-
+        // Plain JS object (Chart.js directly mutates these arrays; making it a
+        // Vue reactive proxy causes infinite recursive observation loops).
         const chartHistory = {
           labels: [],
+          t: [],
+          dts: [],
           genTps: [],
           promptTps: []
+        };
+
+        // Explicit reactive refs updated in updateCharts on each sample
+        const genWindowAvg = ref(0);
+        const genWindowPeak = ref(0);
+        const prefillWindowAvg = ref(0);
+        const prefillWindowPeak = ref(0);
+
+        const recalculateWindowStats = () => {
+          const now = Date.now();
+          let gsum = 0, gdt = 0, gpeak = 0;
+          let psum = 0, pdt = 0, ppeak = 0;
+          for (let i = 0; i < chartHistory.genTps.length; i++) {
+            const dt = chartHistory.dts[i] || 0;
+            const age = now - (chartHistory.t[i] || now);
+            if (age > WINDOW_AVG_SECONDS * 1000) continue;
+            const g = chartHistory.genTps[i] || 0;
+            const p = chartHistory.promptTps[i] || 0;
+            gsum += g * dt;
+            gdt += dt;
+            if (g > gpeak) gpeak = g;
+            psum += p * dt;
+            pdt += dt;
+            if (p > ppeak) ppeak = p;
+          }
+          genWindowAvg.value = gdt > 0 ? Math.round(gsum / gdt) : 0;
+          genWindowPeak.value = Math.round(gpeak);
+          prefillWindowAvg.value = pdt > 0 ? Math.round(psum / pdt) : 0;
+          prefillWindowPeak.value = Math.round(ppeak);
         };
 
         let renderedSpans = [];
@@ -974,17 +960,30 @@
           }
         };
 
+        let lastSampleMs = 0;
+
         const updateCharts = (genTps, promptTps) => {
-          const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          chartHistory.labels.push(now);
+          const nowMs = Date.now();
+          const nowLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          const dt = lastSampleMs > 0 ? (nowMs - lastSampleMs) / 1000 : 1;
+          lastSampleMs = nowMs;
+
+          chartHistory.labels.push(nowLabel);
+          chartHistory.t.push(nowMs);
+          chartHistory.dts.push(dt);
           chartHistory.genTps.push(genTps);
           chartHistory.promptTps.push(promptTps);
 
-          if (chartHistory.labels.length > 25) {
+          const max = 90;
+          if (chartHistory.labels.length > max) {
             chartHistory.labels.shift();
+            chartHistory.t.shift();
+            chartHistory.dts.shift();
             chartHistory.genTps.shift();
             chartHistory.promptTps.shift();
           }
+
+          recalculateWindowStats();
 
           if (genChartInstance) genChartInstance.update();
           if (prefillChartInstance) prefillChartInstance.update();
@@ -1078,6 +1077,22 @@
           return num.toString();
         };
 
+        // Fixed-width variants (up to 3 digits before the dot, always 1 decimal) so
+        // values never change width as digits tick over and push the layout around.
+        const formatTps = (num) => {
+          if (!num || num <= 0) return '0.0';
+          if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + 'M';
+          if (num >= 1_000) return (num / 1_000).toFixed(1) + 'k';
+          return num.toFixed(1);
+        };
+
+        const formatMs = (num) => {
+          if (num == null || num <= 0) return '--';
+          if (num >= 60000) return (num / 60000).toFixed(1) + 'm';
+          if (num >= 1000) return (num / 1000).toFixed(1) + 's';
+          return Math.round(num).toLocaleString() + 'ms';
+        };
+
         const formatTime = (epochSec) => {
           if (!epochSec) return '-';
           return new Date(epochSec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1142,6 +1157,8 @@
           copyCurlSnippet,
           formatNumber,
           formatCompactNumber,
+          formatTps,
+          formatMs,
           formatTime,
           getStatusBadgeClass,
           getLogClass,
