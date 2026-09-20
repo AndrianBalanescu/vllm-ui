@@ -129,6 +129,42 @@
       </div>
     </header>
 
+    <!-- LIFETIME TELEMETRY & TOTALS STATS STRIP (PROMINENT TOP BANNER) -->
+    <div class="glass-card rounded-2xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-4 font-mono border border-slate-700/60 bg-slate-900/90 shadow-xl shadow-black/50">
+      <div class="flex flex-wrap items-center gap-x-8 gap-y-2.5">
+        <div class="flex items-center gap-2.5">
+          <span class="text-slate-400 uppercase tracking-wider text-xs font-bold">Total Requests:</span>
+          <span class="text-white text-base font-extrabold bg-slate-800/90 px-3 py-0.5 rounded-lg border border-slate-700 shadow-sm">{{ formatNumber(stats.totals?.total_requests || 0) }}</span>
+        </div>
+
+        <div class="flex items-center gap-2.5">
+          <span class="text-slate-400 uppercase tracking-wider text-xs font-bold">Total Tokens:</span>
+          <span class="text-emerald-400 text-base font-extrabold tracking-tight">{{ formatCompactNumber(stats.totals?.total_tokens || 0) }}</span>
+          <span class="text-slate-400 text-xs font-medium">({{ formatCompactNumber(stats.totals?.total_prompt_tokens || 0) }} prompt / {{ formatCompactNumber(stats.totals?.total_gen_tokens || 0) }} gen)</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400 uppercase tracking-wider text-xs font-bold">Avg TTFT:</span>
+          <span class="text-teal-300 text-sm font-bold">{{ stats.totals?.avg_ttft_ms ? stats.totals.avg_ttft_ms + ' ms' : '--' }}</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400 uppercase tracking-wider text-xs font-bold">Avg Latency:</span>
+          <span class="text-blue-300 text-sm font-bold">{{ stats.totals?.avg_latency_ms ? formatNumber(stats.totals.avg_latency_ms) + ' ms' : '--' }}</span>
+        </div>
+
+        <div class="flex items-center gap-2" v-if="stats.totals?.accepted_draft_tokens">
+          <span class="text-slate-400 uppercase tracking-wider text-xs font-bold">MTP Draft Accepted:</span>
+          <span class="text-emerald-400 text-sm font-bold">{{ formatCompactNumber(stats.totals.accepted_draft_tokens) }} tok</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 text-xs text-slate-400 font-semibold">
+        <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-slate-300">Zero-overhead engine metrics</span>
+      </div>
+    </div>
+
     <!-- Compact Key Stats Cards Grid -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
       
@@ -206,42 +242,6 @@
         </div>
       </div>
 
-    </div>
-
-    <!-- LIFETIME TELEMETRY & TOTALS STATS STRIP -->
-    <div class="glass-card rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-4 text-xs font-mono border border-slate-800/80 bg-slate-950/60">
-      <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <div class="flex items-center gap-2">
-          <span class="text-slate-500 uppercase tracking-wider text-[10px] font-bold">Total Requests:</span>
-          <span class="text-white font-bold bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">{{ formatNumber(stats.totals?.total_requests || 0) }}</span>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <span class="text-slate-500 uppercase tracking-wider text-[10px] font-bold">Total Tokens:</span>
-          <span class="text-emerald-400 font-bold">{{ formatCompactNumber(stats.totals?.total_tokens || 0) }}</span>
-          <span class="text-slate-500 text-[10px]">({{ formatCompactNumber(stats.totals?.total_prompt_tokens || 0) }} prompt / {{ formatCompactNumber(stats.totals?.total_gen_tokens || 0) }} gen)</span>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <span class="text-slate-500 uppercase tracking-wider text-[10px] font-bold">Avg TTFT:</span>
-          <span class="text-teal-400 font-semibold">{{ stats.totals?.avg_ttft_ms ? stats.totals.avg_ttft_ms + ' ms' : '--' }}</span>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <span class="text-slate-500 uppercase tracking-wider text-[10px] font-bold">Avg Latency:</span>
-          <span class="text-blue-400 font-semibold">{{ stats.totals?.avg_latency_ms ? formatNumber(stats.totals.avg_latency_ms) + ' ms' : '--' }}</span>
-        </div>
-
-        <div class="flex items-center gap-2" v-if="(stats.totals?.total_draft_tokens || 0) > 0">
-          <span class="text-slate-500 uppercase tracking-wider text-[10px] font-bold">MTP Draft Accepted:</span>
-          <span class="text-purple-400 font-semibold">{{ formatCompactNumber(stats.totals?.accepted_draft_tokens || 0) }} tok</span>
-        </div>
-      </div>
-
-      <div class="text-[11px] text-slate-500 flex items-center gap-1.5">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-        <span>Zero-overhead engine metrics</span>
-      </div>
     </div>
 
     <!-- 60FPS STREAMING CANVAS TIMELINE (NO OVERLAY, CLEAN PARALLEL LANES & ZOOM) -->
@@ -353,14 +353,31 @@
       
       <!-- Chart 1: Generation Speed (Dedicated 0 .. 300 tok/s with responsive spikes) -->
       <div class="glass-card rounded-xl p-4">
-        <div class="flex items-center justify-between mb-2">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
           <div class="flex items-center gap-2">
             <i data-lucide="zap" class="w-4 h-4 text-emerald-400"></i>
-            <h2 class="text-sm font-bold text-white">Generation Speed Timeline</h2>
+            <div>
+              <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
+                Generation Speed Timeline
+                <span class="text-[10px] text-slate-400 font-mono font-normal">(Rolling ~60s)</span>
+              </h2>
+            </div>
           </div>
-          <div class="flex items-center gap-2 text-xs font-mono">
-            <span class="text-slate-400">Current:</span>
-            <span class="text-emerald-400 font-bold text-sm">{{ stats.engine?.gen_throughput_tps || 0 }} tok/s</span>
+          <div class="flex items-center gap-2.5 text-xs font-mono">
+            <div>
+              <span class="text-slate-400">Now: </span>
+              <span class="text-emerald-400 font-bold text-sm">{{ stats.engine?.gen_throughput_tps || 0 }} tok/s</span>
+            </div>
+            <div class="h-3 w-[1px] bg-slate-800"></div>
+            <div title="Average generation speed during active output generation in this window">
+              <span class="text-slate-400">Avg: </span>
+              <span class="text-emerald-300 font-semibold">{{ genWindowAvg }} tok/s</span>
+            </div>
+            <div class="h-3 w-[1px] bg-slate-800"></div>
+            <div title="Peak generation speed in this window">
+              <span class="text-slate-400">Peak: </span>
+              <span class="text-white font-bold">{{ genWindowPeak }} tok/s</span>
+            </div>
           </div>
         </div>
         <div class="h-36 w-full">
@@ -370,14 +387,31 @@
 
       <!-- Chart 2: Prompt Prefill Speed (Dedicated 0 .. 8000+ tok/s ratio) -->
       <div class="glass-card rounded-xl p-4">
-        <div class="flex items-center justify-between mb-2">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
           <div class="flex items-center gap-2">
             <i data-lucide="flame" class="w-4 h-4 text-blue-400"></i>
-            <h2 class="text-sm font-bold text-white">Prompt Prefill Speed Timeline</h2>
+            <div>
+              <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
+                Prompt Prefill Speed Timeline
+                <span class="text-[10px] text-slate-400 font-mono font-normal">(Rolling ~60s)</span>
+              </h2>
+            </div>
           </div>
-          <div class="flex items-center gap-2 text-xs font-mono">
-            <span class="text-slate-400">Current:</span>
-            <span class="text-blue-400 font-bold text-sm">{{ stats.engine?.prompt_throughput_tps || 0 }} tok/s</span>
+          <div class="flex items-center gap-2.5 text-xs font-mono">
+            <div>
+              <span class="text-slate-400">Now: </span>
+              <span class="text-blue-400 font-bold text-sm">{{ stats.engine?.prompt_throughput_tps || 0 }} tok/s</span>
+            </div>
+            <div class="h-3 w-[1px] bg-slate-800"></div>
+            <div title="Average prefill speed during prompt ingestion bursts">
+              <span class="text-slate-400">Burst Avg: </span>
+              <span class="text-blue-300 font-semibold">{{ formatCompactNumber(prefillWindowAvg) }} tok/s</span>
+            </div>
+            <div class="h-3 w-[1px] bg-slate-800"></div>
+            <div title="Peak prefill speed in this window">
+              <span class="text-slate-400">Peak: </span>
+              <span class="text-cyan-300 font-bold">{{ formatCompactNumber(prefillWindowPeak) }} tok/s</span>
+            </div>
           </div>
         </div>
         <div class="h-36 w-full">
@@ -564,6 +598,28 @@
         let genChartInstance = null;
         let prefillChartInstance = null;
         let animationFrameId = null;
+        const genWindowAvg = computed(() => {
+          const vals = chartHistory.genTps.filter(v => v > 0);
+          if (!vals.length) return 0;
+          return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+        });
+
+        const genWindowPeak = computed(() => {
+          if (!chartHistory.genTps.length) return 0;
+          return Math.round(Math.max(...chartHistory.genTps));
+        });
+
+        const prefillWindowAvg = computed(() => {
+          const vals = chartHistory.promptTps.filter(v => v > 0);
+          if (!vals.length) return 0;
+          return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+        });
+
+        const prefillWindowPeak = computed(() => {
+          if (!chartHistory.promptTps.length) return 0;
+          return Math.round(Math.max(...chartHistory.promptTps));
+        });
+
         const chartHistory = {
           labels: [],
           genTps: [],
