@@ -296,8 +296,18 @@ def _build_stats():
     total_drafts = get_single("vllm:spec_decode_num_draft_tokens_total", 0.0)
     spec_acceptance_pct = round((accepted_drafts / total_drafts * 100.0), 1) if total_drafts > 0 else None
 
-    cached_tokens = get_single("vllm:num_cached_tokens_total", 0.0)
-    prefix_hit_pct = round((cached_tokens / (cached_tokens + total_prompt_tokens) * 100.0), 1) if (cached_tokens + total_prompt_tokens) > 0 else 0.0
+    cached_tokens = (
+        get_single("vllm:prompt_tokens_cached_total", 0.0)
+        or get_single("vllm:prefix_cache_hits_total", 0.0)
+        or get_single("vllm:num_cached_tokens_total", 0.0)
+    )
+    prefix_queries = get_single("vllm:prefix_cache_queries_total", 0.0)
+    if prefix_queries > 0:
+        prefix_hit_pct = round((cached_tokens / prefix_queries * 100.0), 1)
+    elif (cached_tokens + total_prompt_tokens) > 0:
+        prefix_hit_pct = round((cached_tokens / (cached_tokens + total_prompt_tokens) * 100.0), 1)
+    else:
+        prefix_hit_pct = 0.0
 
     logs = get_recent_vllm_logs()
     instant_prompt_tps = prompt_throughput
