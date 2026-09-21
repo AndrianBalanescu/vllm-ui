@@ -180,12 +180,12 @@ def parse_prometheus_metrics(text):
 def get_recent_vllm_logs():
     try:
         out = subprocess.check_output(
-            ["sudo", "journalctl", "-u", "vllm", "-n", "80", "--no-pager"],
+            ["sudo", "journalctl", "-u", "swift-qwen", "-u", "vllm", "-u", "vllm-qwen", "-n", "80", "--no-pager"],
             stderr=subprocess.DEVNULL, timeout=2
         ).decode()
         lines = []
         for l in out.splitlines():
-            if "Engine 000:" in l or "SpecDecoding metrics:" in l or "POST /v1/chat/completions" in l or "ERROR" in l or "INFO:" in l:
+            if any(k in l for k in ["prompt processing", "print_timing", "eval time", "HTTP", "ERROR", "POST /v1", "Engine", "INFO", "release"]):
                 lines.append(l.strip())
         return lines[-40:]
     except Exception:
