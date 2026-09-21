@@ -157,6 +157,17 @@ class RequestTracker:
             all_items.sort(key=lambda x: x["start_time"])
             return all_items[-150:]
 
+    def get_totals(self):
+        with self.lock:
+            total_reqs = len(self.requests) + len(self.active_requests) + len(self.engine_slots)
+            p_tok = sum(r.get("prompt_tokens", 0) for r in self.requests)
+            c_tok = sum(r.get("completion_tokens", 0) for r in self.requests)
+            return {
+                "total_requests": total_reqs,
+                "total_prompt_tokens": p_tok,
+                "total_gen_tokens": c_tok
+            }
+
 tracker = RequestTracker()
 
 def get_gpu_stats():
