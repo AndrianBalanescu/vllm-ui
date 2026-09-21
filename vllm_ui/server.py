@@ -82,6 +82,32 @@ class RequestTracker:
                 record["model"] = model
             self.requests.append(record)
 
+    def update_slot_task(self, slot_id, model="default", prompt_tokens=0, cached_tokens=0, processed=0):
+        now = time.time()
+        with self.lock:
+            if slot_id not in self.engine_slots:
+                preview = f"Engine Request ({prompt_tokens:,} tok"
+                if cached_tokens > 0:
+                    preview += f", {cached_tokens:,} cached"
+                preview += ")"
+                self.engine_slots[slot_id] = {
+                    "id": slot_id,
+                    "model": model,
+                    "prompt_preview": preview,
+                    "start_time": now,
+                    "end_time": None,
+                    "duration_ms": 0,
+                    "status": "active",
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": processed,
+                    "tps": 0.0
+                }
+            else:
+                rec = self.engine_slots[slot_id]
+                rec["prompt_tokens"] = prompt_tokens
+                rec["completion_tokens"] = processed
+                rec["duration_ms"] = int((now - rec["start_time"]) * 1000)
+
     def sync_engine_slots(self, running_count, default_model="vLLM"):
         now = time.time()
         with self.lock:
@@ -248,26 +274,48 @@ def _build_stats():
 
     parsed = parse_prometheus_metrics(metrics_raw) if metrics_raw else {}
 
-    def get_single(key, default=0.0):
-        val = parsed.get(key, default)
+    def get_single(key, default=None):
+        val = parsed.get(key, None)
+        if val is None:
+            return default
         if isinstance(val, list) and len(val) > 0:
             return val[0]["value"]
         return float(val) if isinstance(val, (int, float)) else default
 
-    running = get_single("vllm:num_requests_running", 0.0)
-    waiting = get_single("vllm:num_requests_waiting", 0.0)
+    running = get_single("vllm:num_requests_running")
+    if running is None:
+        running = get_single("llamacpp:requests_processing", 0.0)
 
-    kv_cache_factor = get_single("vllm:kv_cache_usage_perc", None)
+    waiting = get_single("vllm:num_requests_waiting")
+    if waiting is None:
+        waiting = get_single("llamacpp:requests_deferred", 0.0)
+
+    kv_cache_factor = get_single("vllm:kv_cache_usage_perc")
     if kv_cache_factor is None:
-        kv_cache_factor = get_single("vllm:gpu_cache_usage_factor", 0.0)
+        kv_cache_factor = get_single("vllm:gpu_cache_usage_factor")
+    if kv_cache_factor is None:
+        kv_cache_factor = get_single("llamacpp:kv_cache_usage_ratio", 0.0)
     kv_cache_usage = kv_cache_factor * 100.0
 
     prompt_throughput = get_single("vllm:avg_prompt_throughput_tok_per_s", 0.0)
     gen_throughput = get_single("vllm:avg_generation_throughput_tok_per_s", 0.0)
 
-    total_prompt_tokens = get_single("vllm:prompt_tokens_total", 0.0)
-    total_gen_tokens = get_single("vllm:generation_tokens_total", 0.0)
-    total_requests = get_single("vllm:time_to_first_token_seconds_count", 0.0)
+    total_prompt_tokens = get_single("vllm:prompt_tokens_total")
+    if total_prompt_tokens is None:
+        total_prompt_tokens = get_single("llamacpp:prompt_tokens_total", 0.0)
+
+    total_gen_tokens = get_single("vllm:generation_tokens_total")
+    if total_gen_tokens is None:
+        total_gen_tokens = get_single("llamacpp:tokens_predicted_total", 0.0)
+
+    total_requests = get_single("vllm:time_to_first_token_seconds_count")
+    if total_requests is None:
+        total_requests = get_single("llamacpp:requests_completed_total")
+    if total_requests is None or total_requests == 0.0:
+        tracker_t = tracker.get_totals()
+        total_requests = tracker_t["total_requests"]
+        if total_requests == 0 and (total_prompt_tokens > 0 or total_gen_tokens > 0):
+            total_requests = max(1.0, float(len(tracker.requests) + len(tracker.engine_slots)))
 
     now = time.time()
     dt = max(now - _last_sample_time, 0.5)
@@ -286,23 +334,26 @@ def _build_stats():
     _last_gen_tokens = total_gen_tokens
     _last_prompt_tokens = total_prompt_tokens
 
-    ttft_sum = get_single("vllm:time_to_first_token_seconds_sum", 0.0)
-    ttft_count = get_single("vllm:time_to_first_token_seconds_count", 0.0)
-    avg_ttft_ms = round((ttft_sum / ttft_count * 1000.0), 1) if ttft_count > 0 else None
+    ttft_sum = get_single("vllm:time_to_first_token_seconds_sum")
+    ttft_count = get_single("vllm:time_to_first_token_seconds_count")
+    avg_ttft_ms = round((ttft_sum / ttft_count * 1000.0), 1) if ttft_count and ttft_sum else None
 
-    e2e_sum = get_single("vllm:e2e_request_latency_seconds_sum", 0.0)
-    e2e_count = get_single("vllm:e2e_request_latency_seconds_count", 0.0)
-    avg_latency_ms = round((e2e_sum / e2e_count * 1000.0), 1) if e2e_count > 0 else None
+    e2e_sum = get_single("vllm:e2e_request_latency_seconds_sum")
+    e2e_count = get_single("vllm:e2e_request_latency_seconds_count")
+    avg_latency_ms = round((e2e_sum / e2e_count * 1000.0), 1) if e2e_count and e2e_sum else None
 
     accepted_drafts = get_single("vllm:spec_decode_num_accepted_tokens_total", 0.0)
     total_drafts = get_single("vllm:spec_decode_num_draft_tokens_total", 0.0)
     spec_acceptance_pct = round((accepted_drafts / total_drafts * 100.0), 1) if total_drafts > 0 else None
 
     cached_tokens = (
-        get_single("vllm:prompt_tokens_cached_total", 0.0)
-        or get_single("vllm:prefix_cache_hits_total", 0.0)
-        or get_single("vllm:num_cached_tokens_total", 0.0)
+        get_single("vllm:prompt_tokens_cached_total")
+        or get_single("vllm:prefix_cache_hits_total")
+        or get_single("vllm:num_cached_tokens_total")
     )
+    if cached_tokens is None:
+        cached_tokens = get_single("llamacpp:prompt_tokens_cached_total", 0.0)
+
     prefix_queries = get_single("vllm:prefix_cache_queries_total", 0.0)
     if prefix_queries > 0:
         prefix_hit_pct = round((cached_tokens / prefix_queries * 100.0), 1)
@@ -330,9 +381,42 @@ def _build_stats():
             if m_kv: instant_kv_pct = float(m_kv.group(1))
             if m_pre: instant_prefix_pct = float(m_pre.group(1))
             break
+        # Also parse llama.cpp logs
+        m_lp = re.search(r"prompt processing,.*?[/\s]([\d.]+)\s*tokens per second", l)
+        if not m_lp:
+            m_lp = re.search(r"prompt eval time =.*?([\d.]+)\s*tokens per second", l)
+        if m_lp and float(m_lp.group(1)) > 0 and instant_prompt_tps == 0:
+            instant_prompt_tps = float(m_lp.group(1))
+
+        m_lg = re.search(r"tg = ([\d.]+) t/s", l)
+        if not m_lg:
+            m_lg = re.search(r"eval time =.*?([\d.]+)\s*tokens per second", l)
+        if m_lg and float(m_lg.group(1)) > 0 and instant_gen_tps == 0:
+            instant_gen_tps = float(m_lg.group(1))
 
     models, max_model_len = get_models_info()
     active_model = models[0] if models else "vLLM"
+
+    # Poll llama.cpp /slots to show active requests and token counts in UI table
+    slots_active = 0
+    try:
+        url_slots = f"{Config.vllm_url.rstrip('/')}/slots"
+        req_slots = urllib.request.Request(url_slots)
+        with urllib.request.urlopen(req_slots, timeout=1) as resp:
+            slots_list = json.loads(resp.read().decode())
+            for s in slots_list:
+                if s.get("is_processing"):
+                    slots_active += 1
+                    t_id = f"task-{s.get('id_task', s.get('id', 0))}"
+                    p_tok = s.get("n_prompt_tokens", 0)
+                    c_tok = s.get("n_prompt_tokens_cache", 0)
+                    proc_tok = s.get("n_prompt_tokens_processed", 0)
+                    tracker.update_slot_task(t_id, model=active_model, prompt_tokens=p_tok, cached_tokens=c_tok, processed=proc_tok)
+    except Exception:
+        pass
+
+    if slots_active > 0:
+        running = max(running, float(slots_active))
 
     if instant_prompt_tps > _peak_prompt_tps:
         _peak_prompt_tps = instant_prompt_tps
