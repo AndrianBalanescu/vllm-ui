@@ -408,26 +408,9 @@ def _build_stats():
     models, max_model_len = get_models_info()
     active_model = models[0] if models else "vLLM"
 
-    # Poll llama.cpp /slots to show active requests and token counts in UI table
-    slots_active = 0
-    try:
-        url_slots = f"{Config.vllm_url.rstrip('/')}/slots"
-        req_slots = urllib.request.Request(url_slots)
-        with urllib.request.urlopen(req_slots, timeout=1) as resp:
-            slots_list = json.loads(resp.read().decode())
-            for s in slots_list:
-                if s.get("is_processing"):
-                    slots_active += 1
-                    t_id = f"task-{s.get('id_task', s.get('id', 0))}"
-                    p_tok = s.get("n_prompt_tokens", 0)
-                    c_tok = s.get("n_prompt_tokens_cache", 0)
-                    proc_tok = s.get("n_prompt_tokens_processed", 0)
-                    tracker.update_slot_task(t_id, model=active_model, prompt_tokens=p_tok, cached_tokens=c_tok, processed=proc_tok)
-    except Exception:
-        pass
-
-    if slots_active > 0:
-        running = max(running, float(slots_active))
+    # vLLM exposes live scheduler counts through Prometheus metrics.  The
+    # /slots endpoint belongs to llama.cpp and is not implemented by vLLM;
+    # do not poll it or create one 404 per dashboard refresh.
 
     if instant_prompt_tps > _peak_prompt_tps:
         _peak_prompt_tps = instant_prompt_tps
@@ -524,9 +507,10 @@ class VLLMProxyHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/health":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", "16")
+            body = b'{"status":"ok"}'
+            self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(b'{"status":"ok"}')
+            self.wfile.write(body)
             return
         elif path in ("/", "/index.html"):
             if STATIC_DIR and (STATIC_DIR / "index.html").exists():
